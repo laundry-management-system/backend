@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: laundry
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/laundry}
+    username: ${DB_USERNAME:laundry}
+    password: ${DB_PASSWORD:laundry}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    defer-datasource-initialization: true
+  sql:
+    init:
+      mode: always
+
+app:
+  jwt:
+    # Base64, >= 256 bit. Đổi qua biến môi trường JWT_SECRET khi deploy.
+    secret: ${JWT_SECRET:bGF1bmRyeS1kZXYtc2VjcmV0LWtleS1jaGFuZ2UtbWUtaW4tcHJvZHVjdGlvbiE=}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
