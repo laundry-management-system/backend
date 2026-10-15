@@ -33,4 +33,22 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.create(authDTO.refreshToken()))
                 .body(new AuthenticationResponse(authDTO.accessToken()));
     }
+
+    @Operation(summary = "Đăng xuất", description = "API đăng xuất và xóa refresh token")
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@CookieValue(name = "refresh_token", required = false) String refreshToken) {
+        authService.logout(refreshToken);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.clear())
+                .build();
+    }
+
+    @Operation(summary = "Làm mới token", description = "API làm mới access token bằng refresh token")
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthenticationResponse> refreshToken(@CookieValue(name = "refresh_token", required = false) String refreshToken) {
+        AuthDTO authDTO = authService.refreshToken(refreshToken);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshTokenCookie.create(authDTO.refreshToken()))
+                .body(new AuthenticationResponse(authDTO.accessToken()));
+    }
 }

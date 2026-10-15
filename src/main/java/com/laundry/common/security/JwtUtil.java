@@ -14,6 +14,9 @@ import org.springframework.stereotype.Component;
 public class JwtUtil {
 
     private static final String ROLES_CLAIM = "roles";
+    private static final String TYPE_CLAIM = "type";
+    private static final String TYPE_ACCESS = "access";
+    private static final String TYPE_REFRESH = "refresh";
 
     private final SecretKey key;
     private final long expirationMs;
@@ -32,28 +35,42 @@ public class JwtUtil {
         return Jwts.builder()
                 .subject(username)
                 .claim(ROLES_CLAIM, List.copyOf(roles))
+                .claim(TYPE_CLAIM, TYPE_ACCESS)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + expirationMs))
                 .signWith(key)
                 .compact();
     }
 
-    public String generateRefreshToken(String username, Collection<String> roles) {
+    public String generateRefreshToken(String username) {
         Date now = new Date();
         return Jwts.builder()
                 .id(UUID.randomUUID().toString())
                 .subject(username)
-                .claim(ROLES_CLAIM, List.copyOf(roles))
+                .claim(TYPE_CLAIM, TYPE_REFRESH)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + refreshExpirationMs))
                 .signWith(key)
                 .compact();
     }
 
-    /** Trả claims nếu token hợp lệ và chưa hết hạn, ngược lại empty. */
+    /** Chỉ nhận ACCESS token. JwtFilter dùng hàm này nên refresh token không gọi được API. */
     public Optional<Claims> parse(String token) {
+        return parseWithType(token, TYPE_ACCESS);
+    }
+
+    /** Chỉ nhận REFRESH token, dùng cho /refresh và /logout. */
+    public Optional<Claims> parseRefresh(String token) {
+        return parseWithType(token, TYPE_REFRESH);
+    }
+
+    /** Trả claims nếu token hợp lệ và chưa hết hạn, ngược lại empty. */
+    private Optional<Claims> parseWithType(String token, String expectedType) {
         try {
-            return Optional.of(Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload());
+            Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+            return expectedType.equals(claims.get(TYPE_CLAIM, String.class))
+                    ? Optional.of(claims)
+                    : Optional.empty();
         } catch (JwtException | IllegalArgumentException e) {
             return Optional.empty();
         }
