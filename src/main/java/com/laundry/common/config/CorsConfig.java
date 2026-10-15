@@ -1,13 +1,12 @@
 package com.laundry.common.config;
 
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.List;
 
 /** Khi dev FE đi qua proxy Vite nên không cần CORS; cấu hình này cho trường hợp FE gọi thẳng BE. */
 @Configuration
