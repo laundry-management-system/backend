@@ -2,7 +2,8 @@ package com.laundry.modules.auth.domain;
 
 import com.laundry.common.entity.BaseEntity;
 import jakarta.persistence.*;
-import java.time.Instant;
+import java.time.LocalDate;
+
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
@@ -40,9 +41,19 @@ public class User extends BaseEntity {
     Status status;
 
     @Column(name = "hired_date")
-    Instant hiredDate;
+    LocalDate hiredDate;
 
     public boolean isActive(){
         return this.status.equals(Status.ACTIVE);
+    }
+    public void updateProfile(String fullName, String phone){
+        this.fullName = fullName;
+        this.phone = phone;
+    }
+    public void disable(){
+        this.status = Status.INACTIVE;
+    }
+    public void enable(){
+        this.status = Status.ACTIVE;
     }
 }
