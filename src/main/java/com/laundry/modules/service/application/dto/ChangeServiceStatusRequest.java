@@ -4,6 +4,6 @@ import com.laundry.modules.service.domain.ServiceStatus;
 import jakarta.validation.constraints.NotNull;
 
 public record ChangeServiceStatusRequest(
-        @NotNull(message = "Trạng thái dịch vụ không được để trống")
+        @NotNull(message = "Service status must not be null")
         ServiceStatus status
 ) {}

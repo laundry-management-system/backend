@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-@Tag(name = "Customer Management", description = "Quản lý hồ sơ khách hàng (M3 - Thành viên 2: UC02, BM1, QĐ1, BR-B)")
+@Tag(name = "Customer Management", description = "Customer profile management (M3 - Member 2: UC02, BM1, QD1, BR-B)")
 @RestController
 @RequestMapping("/api/customers")
 @RequiredArgsConstructor
@@ -34,7 +34,7 @@ public class CustomerController {
 
     private final CustomerService customerService;
 
-    @Operation(summary = "Tiếp nhận & tạo hồ sơ khách hàng mới (UC02 / BM1)")
+    @Operation(summary = "Create customer profile (UC02 / BM1)")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public CustomerResponse createCustomer(
@@ -45,25 +45,25 @@ public class CustomerController {
         return customerService.createCustomer(request, staff);
     }
 
-    @Operation(summary = "Tra cứu khách hàng theo Số điện thoại (UC02 / BM1 - Khóa tra cứu chính BR-B01)")
+    @Operation(summary = "Find customer by phone number (UC02 / BM1 - Primary lookup key BR-B01)")
     @GetMapping("/by-phone/{phone}")
     public CustomerResponse getCustomerByPhone(@PathVariable String phone) {
         return customerService.getCustomerByPhone(phone);
     }
 
-    @Operation(summary = "Tra cứu khách hàng theo Mã khách hàng (KHxxxxxx)")
+    @Operation(summary = "Find customer by customer code (KHxxxxxx)")
     @GetMapping("/by-code/{code}")
     public CustomerResponse getCustomerByCode(@PathVariable String code) {
         return customerService.getCustomerByCode(code);
     }
 
-    @Operation(summary = "Xem chi tiết hồ sơ khách hàng theo ID (BM1)")
+    @Operation(summary = "Get customer details by ID (BM1)")
     @GetMapping("/{id}")
     public CustomerResponse getCustomerById(@PathVariable Long id) {
         return customerService.getCustomerById(id);
     }
 
-    @Operation(summary = "Danh sách khách hàng (tìm kiếm theo tên, SĐT, mã; hỗ trợ phân trang)")
+    @Operation(summary = "List customers (search by name, phone, code; supports pagination)")
     @GetMapping
     public Page<CustomerResponse> listCustomers(
             @RequestParam(required = false) String search,
@@ -72,7 +72,7 @@ public class CustomerController {
         return customerService.listCustomers(search, pageable);
     }
 
-    @Operation(summary = "Cập nhật thông tin khách hàng (UC02)")
+    @Operation(summary = "Update customer details (UC02)")
     @PutMapping("/{id}")
     public CustomerResponse updateCustomer(
             @PathVariable Long id,
@@ -83,7 +83,7 @@ public class CustomerController {
         return customerService.updateCustomer(id, request, staff);
     }
 
-    @Operation(summary = "Thay đổi trạng thái hoạt động (ACTIVE / INACTIVE) - Không xóa dữ liệu theo BR-B03")
+    @Operation(summary = "Change customer status (ACTIVE / INACTIVE) - Soft deactivate per BR-B03")
     @PatchMapping("/{id}/status")
     public CustomerResponse changeStatus(
             @PathVariable Long id,

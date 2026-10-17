@@ -24,7 +24,7 @@ public class CustomerService {
     public CustomerResponse createCustomer(CreateCustomerRequest request, String staffUsername) {
         String phone = request.phone().trim();
         if (customerRepository.existsByPhone(phone)) {
-            throw new BusinessException("Số điện thoại '" + phone + "' đã được đăng ký trong hệ thống (BR-B01)");
+            throw new BusinessException("Phone number '" + phone + "' is already registered in the system (BR-B01)");
         }
 
         String customerCode = generateCustomerCode();
@@ -48,7 +48,7 @@ public class CustomerService {
     public CustomerResponse getCustomerById(Long id) {
         return customerRepository.findById(id)
                 .map(CustomerResponse::from)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy thông tin khách hàng với ID: " + id));
+                .orElseThrow(() -> new NotFoundException("Customer not found with ID: " + id));
     }
 
     @Transactional(readOnly = true)
@@ -56,7 +56,7 @@ public class CustomerService {
         String cleanPhone = phone != null ? phone.trim() : "";
         return customerRepository.findByPhone(cleanPhone)
                 .map(CustomerResponse::from)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy khách hàng với số điện thoại: " + cleanPhone));
+                .orElseThrow(() -> new NotFoundException("Customer not found with phone number: " + cleanPhone));
     }
 
     @Transactional(readOnly = true)
@@ -64,7 +64,7 @@ public class CustomerService {
         String cleanCode = code != null ? code.trim() : "";
         return customerRepository.findByCustomerCode(cleanCode)
                 .map(CustomerResponse::from)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy khách hàng với mã: " + cleanCode));
+                .orElseThrow(() -> new NotFoundException("Customer not found with code: " + cleanCode));
     }
 
     @Transactional(readOnly = true)
@@ -76,12 +76,12 @@ public class CustomerService {
     @Transactional
     public CustomerResponse updateCustomer(Long id, UpdateCustomerRequest request, String staffUsername) {
         Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy khách hàng với ID: " + id));
+                .orElseThrow(() -> new NotFoundException("Customer not found with ID: " + id));
 
         if (request.phone() != null && !request.phone().isBlank()) {
             String newPhone = request.phone().trim();
             if (customerRepository.existsByPhoneAndIdNot(newPhone, id)) {
-                throw new BusinessException("Số điện thoại '" + newPhone + "' đã thuộc về một khách hàng khác (BR-B01)");
+                throw new BusinessException("Phone number '" + newPhone + "' is already registered to another customer (BR-B01)");
             }
             customer.updatePhone(newPhone);
         }
@@ -94,7 +94,7 @@ public class CustomerService {
     @Transactional
     public CustomerResponse changeStatus(Long id, CustomerStatus status) {
         Customer customer = customerRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy khách hàng với ID: " + id));
+                .orElseThrow(() -> new NotFoundException("Customer not found with ID: " + id));
 
         if (status == CustomerStatus.INACTIVE) {
             customer.deactivate();

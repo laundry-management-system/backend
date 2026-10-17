@@ -33,7 +33,7 @@ public class LaundryServiceService {
     public ServiceResponse getServiceById(Long id) {
         return serviceRepository.findById(id)
                 .map(ServiceResponse::from)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy dịch vụ với ID: " + id));
+                .orElseThrow(() -> new NotFoundException("Service not found with ID: " + id));
     }
 
     @Transactional(readOnly = true)
@@ -41,7 +41,7 @@ public class LaundryServiceService {
         String cleanCode = code != null ? code.trim() : "";
         return serviceRepository.findByServiceCode(cleanCode)
                 .map(ServiceResponse::from)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy dịch vụ với mã: " + cleanCode));
+                .orElseThrow(() -> new NotFoundException("Service not found with code: " + cleanCode));
     }
 
     @Transactional
@@ -51,7 +51,7 @@ public class LaundryServiceService {
                 : generateServiceCode();
 
         if (serviceRepository.existsByServiceCode(code)) {
-            throw new BusinessException("Mã dịch vụ '" + code + "' đã tồn tại trong bảng giá");
+            throw new BusinessException("Service code '" + code + "' already exists in the price list");
         }
 
         LaundryService service = LaundryService.builder()
@@ -75,7 +75,7 @@ public class LaundryServiceService {
     @Transactional
     public ServiceResponse updateService(Long id, UpdateServiceRequest request) {
         LaundryService service = serviceRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy dịch vụ với ID: " + id));
+                .orElseThrow(() -> new NotFoundException("Service not found with ID: " + id));
 
         service.updateDetails(
                 request.name(),
@@ -94,7 +94,7 @@ public class LaundryServiceService {
     @Transactional
     public ServiceResponse changeStatus(Long id, ServiceStatus status) {
         LaundryService service = serviceRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Không tìm thấy dịch vụ với ID: " + id));
+                .orElseThrow(() -> new NotFoundException("Service not found with ID: " + id));
 
         if (status == ServiceStatus.INACTIVE) {
             service.deactivate();

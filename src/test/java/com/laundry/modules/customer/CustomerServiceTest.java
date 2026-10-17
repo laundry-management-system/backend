@@ -26,7 +26,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,13 +39,13 @@ class CustomerServiceTest {
     private CustomerService customerService;
 
     @Test
-    @DisplayName("Tạo khách hàng mới thành công với đầy đủ thông tin hợp lệ")
+    @DisplayName("Create customer successfully with valid data")
     void createCustomer_Success() {
         CreateCustomerRequest request = new CreateCustomerRequest(
-                "Nguyễn Văn An",
+                "John Doe",
                 "0901234567",
-                "123 Nguyễn Huệ, Q1, TP.HCM",
-                "Khách thích giặt xả Comfort"
+                "123 Main St, District 1",
+                "Customer prefers Comfort fabric softener"
         );
 
         when(customerRepository.existsByPhone("0901234567")).thenReturn(false);
@@ -70,7 +69,7 @@ class CustomerServiceTest {
 
         assertThat(response).isNotNull();
         assertThat(response.customerCode()).isEqualTo("KH000001");
-        assertThat(response.fullName()).isEqualTo("Nguyễn Văn An");
+        assertThat(response.fullName()).isEqualTo("John Doe");
         assertThat(response.phone()).isEqualTo("0901234567");
         assertThat(response.status()).isEqualTo(CustomerStatus.ACTIVE);
         assertThat(response.isVip()).isFalse();
@@ -78,12 +77,12 @@ class CustomerServiceTest {
     }
 
     @Test
-    @DisplayName("Tạo khách hàng thất bại khi số điện thoại đã tồn tại (BR-B01)")
+    @DisplayName("Create customer fails when phone number already exists (BR-B01)")
     void createCustomer_DuplicatePhone_ThrowsBusinessException() {
         CreateCustomerRequest request = new CreateCustomerRequest(
-                "Trần Thị Bình",
+                "Jane Doe",
                 "0912345678",
-                "456 Lê Lợi",
+                "456 Second St",
                 null
         );
 
@@ -91,15 +90,15 @@ class CustomerServiceTest {
 
         assertThatThrownBy(() -> customerService.createCustomer(request, "staff01"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("đã được đăng ký trong hệ thống (BR-B01)");
+                .hasMessageContaining("BR-B01");
     }
 
     @Test
-    @DisplayName("Tra cứu khách hàng theo SĐT thành công (Fast Check-in)")
+    @DisplayName("Find customer by phone number successfully (Fast Check-in)")
     void getCustomerByPhone_Success() {
         Customer customer = Customer.builder()
                 .customerCode("KH000010")
-                .fullName("Lê Văn Cường")
+                .fullName("Alex Smith")
                 .phone("0988776655")
                 .status(CustomerStatus.ACTIVE)
                 .isVip(true)
@@ -110,28 +109,28 @@ class CustomerServiceTest {
         CustomerResponse response = customerService.getCustomerByPhone("0988776655");
 
         assertThat(response).isNotNull();
-        assertThat(response.fullName()).isEqualTo("Lê Văn Cường");
+        assertThat(response.fullName()).isEqualTo("Alex Smith");
         assertThat(response.isVip()).isTrue();
     }
 
     @Test
-    @DisplayName("Tra cứu khách hàng theo SĐT không tồn tại -> ném NotFoundException")
+    @DisplayName("Find customer by phone number fails when not found -> throws NotFoundException")
     void getCustomerByPhone_NotFound() {
         when(customerRepository.findByPhone("0999999999")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> customerService.getCustomerByPhone("0999999999"))
                 .isInstanceOf(NotFoundException.class)
-                .hasMessageContaining("Không tìm thấy khách hàng");
+                .hasMessageContaining("Customer not found");
     }
 
     @Test
-    @DisplayName("Cập nhật thông tin khách hàng thành công")
+    @DisplayName("Update customer details successfully")
     void updateCustomer_Success() {
         Customer existing = Customer.builder()
                 .customerCode("KH000005")
-                .fullName("Phạm Văn D")
+                .fullName("David Brown")
                 .phone("0933112233")
-                .address("Địa chỉ cũ")
+                .address("Old Address")
                 .status(CustomerStatus.ACTIVE)
                 .build();
 
@@ -139,25 +138,25 @@ class CustomerServiceTest {
         when(customerRepository.save(any(Customer.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         UpdateCustomerRequest updateReq = new UpdateCustomerRequest(
-                "Phạm Văn Dũng",
+                "David Brown Jr.",
                 "0933112233",
-                "Địa chỉ mới, Q3",
-                "Ghi chú mới"
+                "New Address, District 3",
+                "Updated note"
         );
 
         CustomerResponse response = customerService.updateCustomer(5L, updateReq, "admin");
 
-        assertThat(response.fullName()).isEqualTo("Phạm Văn Dũng");
-        assertThat(response.address()).isEqualTo("Địa chỉ mới, Q3");
-        assertThat(response.note()).isEqualTo("Ghi chú mới");
+        assertThat(response.fullName()).isEqualTo("David Brown Jr.");
+        assertThat(response.address()).isEqualTo("New Address, District 3");
+        assertThat(response.note()).isEqualTo("Updated note");
     }
 
     @Test
-    @DisplayName("Cập nhật số điện thoại bị trùng với khách khác -> ném BusinessException (BR-B01)")
+    @DisplayName("Update customer phone fails when duplicate -> throws BusinessException (BR-B01)")
     void updateCustomer_DuplicatePhone_ThrowsBusinessException() {
         Customer existing = Customer.builder()
                 .customerCode("KH000005")
-                .fullName("Phạm Văn D")
+                .fullName("David Brown")
                 .phone("0933112233")
                 .build();
 
@@ -165,7 +164,7 @@ class CustomerServiceTest {
         when(customerRepository.existsByPhoneAndIdNot("0977889900", 5L)).thenReturn(true);
 
         UpdateCustomerRequest updateReq = new UpdateCustomerRequest(
-                "Phạm Văn D",
+                "David Brown",
                 "0977889900",
                 null,
                 null
@@ -173,15 +172,15 @@ class CustomerServiceTest {
 
         assertThatThrownBy(() -> customerService.updateCustomer(5L, updateReq, "admin"))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("đã thuộc về một khách hàng khác (BR-B01)");
+                .hasMessageContaining("BR-B01");
     }
 
     @Test
-    @DisplayName("Chuyển trạng thái khách hàng sang INACTIVE (vô hiệu hóa thay cho xóa BR-B03)")
+    @DisplayName("Change customer status to INACTIVE (soft deactivate per BR-B03)")
     void changeStatus_Deactivate_Success() {
         Customer existing = Customer.builder()
                 .customerCode("KH000005")
-                .fullName("Khách hàng A")
+                .fullName("Customer A")
                 .phone("0900112233")
                 .status(CustomerStatus.ACTIVE)
                 .build();
@@ -195,11 +194,11 @@ class CustomerServiceTest {
     }
 
     @Test
-    @DisplayName("Tìm kiếm phân trang danh sách khách hàng")
+    @DisplayName("List customers with search and pagination")
     void listCustomers_Success() {
         Pageable pageable = PageRequest.of(0, 10);
-        Customer c1 = Customer.builder().customerCode("KH000001").fullName("An").phone("0901").build();
-        Customer c2 = Customer.builder().customerCode("KH000002").fullName("Bình").phone("0902").build();
+        Customer c1 = Customer.builder().customerCode("KH000001").fullName("Alex").phone("0901").build();
+        Customer c2 = Customer.builder().customerCode("KH000002").fullName("Ben").phone("0902").build();
 
         when(customerRepository.searchCustomers("090", pageable))
                 .thenReturn(new PageImpl<>(List.of(c1, c2), pageable, 2));

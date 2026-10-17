@@ -7,9 +7,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum ServiceUnit {
     KG("kg"),
-    PIECE("món"),
-    SET("bộ"),
-    PRODUCT("sản phẩm");
+    PIECE("piece"),
+    SET("set"),
+    PRODUCT("product");
 
     private final String displayName;
 }

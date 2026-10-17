@@ -5,16 +5,16 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 public record UpdateCustomerRequest(
-        @NotBlank(message = "Họ và tên khách hàng không được để trống (BR-B02)")
-        @Size(max = 100, message = "Họ tên tối đa 100 ký tự")
+        @NotBlank(message = "Customer full name must not be blank (BR-B02)")
+        @Size(max = 100, message = "Full name must not exceed 100 characters")
         String fullName,
 
-        @Pattern(regexp = "^0\\d{9}$", message = "Số điện thoại phải gồm 10 chữ số bắt đầu bằng 0 (BR-B01)")
+        @Pattern(regexp = "^0\\d{9}$", message = "Phone number must contain 10 digits starting with 0 (BR-B01)")
         String phone,
 
-        @Size(max = 255, message = "Địa chỉ tối đa 255 ký tự")
+        @Size(max = 255, message = "Address must not exceed 255 characters")
         String address,
 
-        @Size(max = 500, message = "Ghi chú tối đa 500 ký tự")
+        @Size(max = 500, message = "Note must not exceed 500 characters")
         String note
 ) {}

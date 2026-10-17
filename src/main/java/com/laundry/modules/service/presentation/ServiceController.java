@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-@Tag(name = "Service & Pricing Management", description = "Quản lý dịch vụ và bảng giá hiện hành (M3 - Thành viên 2: UC03, UC17, BM2, QĐ2, BR-C)")
+@Tag(name = "Service & Pricing Management", description = "Service catalog and active pricing management (M3 - Member 2: UC03, UC17, BM2, QD2, BR-C)")
 @RestController
 @RequestMapping("/api/services")
 @RequiredArgsConstructor
@@ -32,7 +32,7 @@ public class ServiceController {
 
     private final LaundryServiceService laundryServiceService;
 
-    @Operation(summary = "Xem danh sách dịch vụ và bảng giá hiện hành (UC03 / BM2 - Nhân viên & Admin)")
+    @Operation(summary = "View service catalog and active price list (UC03 / BM2 - Staff & Admin)")
     @GetMapping
     public List<ServiceResponse> getAllServices(
             @RequestParam(required = false, defaultValue = "false") Boolean activeOnly
@@ -40,19 +40,19 @@ public class ServiceController {
         return laundryServiceService.getAllServices(activeOnly);
     }
 
-    @Operation(summary = "Xem chi tiết dịch vụ theo ID (BM2)")
+    @Operation(summary = "Get service details by ID (BM2)")
     @GetMapping("/{id}")
     public ServiceResponse getServiceById(@PathVariable Long id) {
         return laundryServiceService.getServiceById(id);
     }
 
-    @Operation(summary = "Xem chi tiết dịch vụ theo Mã (DVxx)")
+    @Operation(summary = "Get service details by code (DVxx)")
     @GetMapping("/by-code/{code}")
     public ServiceResponse getServiceByCode(@PathVariable String code) {
         return laundryServiceService.getServiceByCode(code);
     }
 
-    @Operation(summary = "Thêm dịch vụ mới vào bảng giá (UC17 - Chỉ Admin được thực hiện, BR-C01, QĐ2)")
+    @Operation(summary = "Add new service to price list (UC17 - Admin only, BR-C01, QD2)")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('ADMIN')")
@@ -60,7 +60,7 @@ public class ServiceController {
         return laundryServiceService.createService(request);
     }
 
-    @Operation(summary = "Cập nhật thông tin dịch vụ & đơn giá (UC17 - Chỉ Admin được thực hiện, BR-C01, QĐ2)")
+    @Operation(summary = "Update service details and price (UC17 - Admin only, BR-C01, QD2)")
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ServiceResponse updateService(
@@ -70,7 +70,7 @@ public class ServiceController {
         return laundryServiceService.updateService(id, request);
     }
 
-    @Operation(summary = "Thay đổi trạng thái hoạt động (ACTIVE / INACTIVE) - Không xóa dịch vụ đã dùng theo BR-C05")
+    @Operation(summary = "Change service status (ACTIVE / INACTIVE) - Soft deactivate per BR-C05")
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ServiceResponse changeStatus(
