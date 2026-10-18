@@ -3,7 +3,6 @@ package com.laundry.modules.auth.domain;
 import com.laundry.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import java.time.LocalDate;
-
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 

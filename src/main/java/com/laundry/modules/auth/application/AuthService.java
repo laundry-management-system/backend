@@ -7,19 +7,18 @@ import com.laundry.modules.auth.application.dto.AuthDTO;
 import com.laundry.modules.auth.application.dto.LoginRequest;
 import com.laundry.modules.auth.domain.User;
 import com.laundry.modules.auth.domain.UserRepository;
+import io.jsonwebtoken.Claims;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-
-import io.jsonwebtoken.Claims;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,9 +48,11 @@ public class AuthService {
                             loginRequest.password()
                     )
             );
-        }catch (AuthenticationException e){
+        }catch (BadCredentialsException e){
             recordFailedAttempt(loginRequest.username());
             throw new BusinessException("Tên đăng nhập hoặc mật khẩu không đúng.");
+        }catch (DisabledException e){
+            throw new BusinessException("Tài khoản đã bị vô hiệu hóa");
         }
 
         resetFailedAttempts(loginRequest.username());
