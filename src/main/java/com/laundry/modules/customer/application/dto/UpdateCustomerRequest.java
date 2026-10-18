@@ -9,7 +9,7 @@ public record UpdateCustomerRequest(
         @Size(max = 100, message = "Full name must not exceed 100 characters")
         String fullName,
 
-        @Pattern(regexp = "^0\\d{9}$", message = "Phone number must contain 10 digits starting with 0 (BR-B01)")
+        @Pattern(regexp = "^0\\d{9}$", message = "Phone number must contain 10 digits starting with 0")
         String phone,
 
         @Size(max = 255, message = "Address must not exceed 255 characters")

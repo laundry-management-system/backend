@@ -57,22 +57,6 @@ public class Customer extends BaseEntity {
     @Column(name = "created_by", length = 50)
     private String createdBy;
 
-    public void updateInfo(String fullName, String address, String note) {
-        if (fullName == null || fullName.trim().isEmpty()) {
-            throw new BusinessException("Customer full name must not be blank (BR-B02)");
-        }
-        this.fullName = fullName.trim();
-        this.address = address != null ? address.trim() : null;
-        this.note = note != null ? note.trim() : null;
-    }
-
-    public void updatePhone(String newPhone) {
-        if (newPhone == null || !newPhone.matches("^0\\d{9}$")) {
-            throw new BusinessException("Phone number must contain 10 digits starting with 0 (BR-B01)");
-        }
-        this.phone = newPhone.trim();
-    }
-
     public void deactivate() {
         if (this.status == CustomerStatus.INACTIVE) {
             throw new BusinessException("Customer is already inactive");

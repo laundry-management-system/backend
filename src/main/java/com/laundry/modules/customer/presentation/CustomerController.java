@@ -76,11 +76,9 @@ public class CustomerController {
     @PutMapping("/{id}")
     public CustomerResponse updateCustomer(
             @PathVariable Long id,
-            @Valid @RequestBody UpdateCustomerRequest request,
-            Authentication authentication
+            @Valid @RequestBody UpdateCustomerRequest request
     ) {
-        String staff = getUsername(authentication);
-        return customerService.updateCustomer(id, request, staff);
+        return customerService.updateCustomer(id, request);
     }
 
     @Operation(summary = "Change customer status (ACTIVE / INACTIVE) - Soft deactivate per BR-B03")
