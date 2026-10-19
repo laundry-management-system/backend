@@ -1,6 +1,5 @@
 package com.laundry.modules.service.application;
 
-import com.laundry.common.exception.BusinessException;
 import com.laundry.common.exception.NotFoundException;
 import com.laundry.modules.service.application.dto.CreateServiceRequest;
 import com.laundry.modules.service.application.dto.ServiceResponse;
@@ -13,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -20,7 +20,6 @@ public class LaundryServiceService {
 
     private final LaundryServiceRepository serviceRepository;
 
-    @Transactional(readOnly = true)
     public List<ServiceResponse> getAllServices(Boolean activeOnly) {
         List<LaundryService> list = Boolean.TRUE.equals(activeOnly)
                 ? serviceRepository.findByStatusOrderByServiceCodeAsc(ServiceStatus.ACTIVE)
@@ -29,14 +28,12 @@ public class LaundryServiceService {
         return list.stream().map(ServiceResponse::from).toList();
     }
 
-    @Transactional(readOnly = true)
     public ServiceResponse getServiceById(Long id) {
         return serviceRepository.findById(id)
                 .map(ServiceResponse::from)
                 .orElseThrow(() -> new NotFoundException("Service not found with ID: " + id));
     }
 
-    @Transactional(readOnly = true)
     public ServiceResponse getServiceByCode(String code) {
         String cleanCode = code != null ? code.trim() : "";
         return serviceRepository.findByServiceCode(cleanCode)
@@ -46,21 +43,13 @@ public class LaundryServiceService {
 
     @Transactional
     public ServiceResponse createService(CreateServiceRequest request) {
-        String code = request.serviceCode() != null && !request.serviceCode().isBlank()
-                ? request.serviceCode().trim().toUpperCase()
-                : generateServiceCode();
-
-        if (serviceRepository.existsByServiceCode(code)) {
-            throw new BusinessException("Service code '" + code + "' already exists in the price list");
-        }
-
         LaundryService service = LaundryService.builder()
-                .serviceCode(code)
+                .serviceCode("TPM-"+ UUID.randomUUID())
                 .name(request.name().trim())
                 .unit(request.unit())
                 .currentPrice(request.currentPrice())
                 .standardHours(request.standardHours())
-                .expressSupported(Boolean.TRUE.equals(request.expressSupported()))
+                .expressSupported(request.expressSupported() != null ? request.expressSupported() : false)
                 .expressSurcharge(request.expressSurcharge())
                 .expressHours(request.expressHours())
                 .status(ServiceStatus.ACTIVE)
@@ -68,7 +57,9 @@ public class LaundryServiceService {
 
         service.validateBusinessRules();
 
-        LaundryService saved = serviceRepository.save(service);
+        LaundryService saved = serviceRepository.saveAndFlush(service);
+        saved.setServiceCode(String.format("DV%02d",saved.getId()));
+
         return ServiceResponse.from(saved);
     }
 
@@ -77,18 +68,30 @@ public class LaundryServiceService {
         LaundryService service = serviceRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Service not found with ID: " + id));
 
-        service.updateDetails(
-                request.name(),
-                request.unit(),
-                request.currentPrice(),
-                request.standardHours(),
-                request.expressSupported(),
-                request.expressSurcharge(),
-                request.expressHours()
-        );
+        if (request.name() != null && !request.name().trim().isEmpty()) {
+            service.setName(request.name().trim());
+        }
+        if (request.unit() != null) {
+            service.setUnit(request.unit());
+        }
+        if (request.currentPrice() != null) {
+            service.setCurrentPrice(request.currentPrice());
+        }
+        if (request.standardHours() != null) {
+            service.setStandardHours(request.standardHours());
+        }
+        if (request.expressSupported() != null) {
+            service.setExpressSupported(request.expressSupported());
+        }
 
-        LaundryService saved = serviceRepository.save(service);
-        return ServiceResponse.from(saved);
+        service.setExpressSurcharge(request.expressSurcharge());
+        service.setExpressHours(request.expressHours());
+
+        service.validateBusinessRules();
+
+        this.serviceRepository.save(service);
+
+        return ServiceResponse.from(service);
     }
 
     @Transactional
@@ -104,19 +107,5 @@ public class LaundryServiceService {
 
         LaundryService saved = serviceRepository.save(service);
         return ServiceResponse.from(saved);
-    }
-
-    private String generateServiceCode() {
-        long nextId = serviceRepository.findTopByOrderByIdDesc()
-                .map(s -> s.getId() + 1)
-                .orElse(1L);
-
-        String candidate = String.format("DV%02d", nextId);
-        long counter = nextId;
-        while (serviceRepository.existsByServiceCode(candidate)) {
-            counter++;
-            candidate = String.format("DV%02d", counter);
-        }
-        return candidate;
     }
 }

@@ -28,11 +28,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/services")
 @RequiredArgsConstructor
-public class ServiceController {
+public class LaundryServiceController {
 
     private final LaundryServiceService laundryServiceService;
 
-    @Operation(summary = "View service catalog and active price list (UC03 / BM2 - Staff & Admin)")
+    @Operation(summary = "View service catalog and active price list (Staff & Admin)")
     @GetMapping
     public List<ServiceResponse> getAllServices(
             @RequestParam(required = false, defaultValue = "false") Boolean activeOnly
@@ -40,19 +40,19 @@ public class ServiceController {
         return laundryServiceService.getAllServices(activeOnly);
     }
 
-    @Operation(summary = "Get service details by ID (BM2)")
+    @Operation(summary = "Get service details by ID")
     @GetMapping("/{id}")
     public ServiceResponse getServiceById(@PathVariable Long id) {
         return laundryServiceService.getServiceById(id);
     }
 
     @Operation(summary = "Get service details by code (DVxx)")
-    @GetMapping("/by-code/{code}")
+    @GetMapping("/code/{code}")
     public ServiceResponse getServiceByCode(@PathVariable String code) {
         return laundryServiceService.getServiceByCode(code);
     }
 
-    @Operation(summary = "Add new service to price list (UC17 - Admin only, BR-C01, QD2)")
+    @Operation(summary = "Add new laundry service (UC17 - Admin only, BR-C01, QD2)")
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize("hasRole('ADMIN')")
@@ -70,7 +70,7 @@ public class ServiceController {
         return laundryServiceService.updateService(id, request);
     }
 
-    @Operation(summary = "Change service status (ACTIVE / INACTIVE) - Soft deactivate per BR-C05")
+    @Operation(summary = "Change service status (ACTIVE / INACTIVE) - Soft deactivate")
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ServiceResponse changeStatus(

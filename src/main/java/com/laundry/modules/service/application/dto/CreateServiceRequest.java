@@ -10,17 +10,14 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
 public record CreateServiceRequest(
-        @Size(max = 10, message = "Service code must not exceed 10 characters")
-        String serviceCode,
-
         @NotBlank(message = "Service name must not be blank")
         @Size(max = 100, message = "Service name must not exceed 100 characters")
         String name,
 
-        @NotNull(message = "Service unit must not be null (BR-C04)")
+        @NotNull(message = "Service unit must not be null")
         ServiceUnit unit,
 
-        @NotNull(message = "Current price must not be null (BR-C01)")
+        @NotNull(message = "Current price must not be null")
         @DecimalMin(value = "0", message = "Price must be greater than or equal to 0")
         BigDecimal currentPrice,
 

@@ -11,8 +11,6 @@ public interface LaundryServiceRepository extends JpaRepository<LaundryService, 
 
     boolean existsByServiceCode(String serviceCode);
 
-    boolean existsByServiceCodeAndIdNot(String serviceCode, Long id);
-
     List<LaundryService> findByStatusOrderByServiceCodeAsc(ServiceStatus status);
 
     List<LaundryService> findAllByOrderByServiceCodeAsc();

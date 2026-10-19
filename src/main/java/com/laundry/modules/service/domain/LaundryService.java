@@ -28,7 +28,7 @@ import java.math.BigDecimal;
 @Getter
 @Setter
 @Builder
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor
 @AllArgsConstructor
 public class LaundryService extends BaseEntity {
 
@@ -65,10 +65,10 @@ public class LaundryService extends BaseEntity {
 
     public void validateBusinessRules() {
         if (this.currentPrice == null || this.currentPrice.compareTo(BigDecimal.ZERO) < 0) {
-            throw new BusinessException("Service price must be greater than or equal to 0 (BR-C01)");
+            throw new BusinessException("Service price must be greater than or equal to 0");
         }
         if (this.standardHours == null || this.standardHours <= 0) {
-            throw new BusinessException("Standard processing time must be greater than 0 hours (BR-C06)");
+            throw new BusinessException("Standard processing time must be greater than 0 hours");
         }
         if (Boolean.TRUE.equals(this.expressSupported)) {
             if (this.expressSurcharge == null || this.expressSurcharge.compareTo(BigDecimal.ZERO) < 0) {
