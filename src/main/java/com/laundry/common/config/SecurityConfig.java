@@ -28,6 +28,7 @@ public class SecurityConfig {
     private static final String[] PUBLIC_PATHS = {
             "/api/health",
             "/api/auth/**",
+            "/api/users/setup-password",
             "/swagger-ui.html",
             "/swagger-ui/**",
             "/v3/api-docs/**",
