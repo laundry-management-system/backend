@@ -1,8 +1,11 @@
 package com.laundry.modules.auth.application.dto;
 
+import com.laundry.modules.auth.domain.Role;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import java.time.LocalDate;
 import org.hibernate.validator.constraints.Length;
 
 @Schema(description = "Request tạo tài khoản nhân viên")
@@ -21,13 +24,14 @@ public record CreateUserRequest(
         )
         String phone,
 
-        @Schema(description = "Tên đăng nhập", example = "username123")
-        @NotBlank(message = "Tên đăng nhập không được để trống")
-        @Length(min = 10, max = 50, message = "Tên đăng nhập không được vượt quá 50 ký tự")
-        String username,
+        @Schema(description = "Email", example = "example@gmail.com")
+        @NotBlank(message = "Email không được để trống")
+        @Email(message = "Email không đúng dịnh dạng")
+        String email,
 
-        @Schema(description = "Mật khẩu", example = "password123")
-        @NotBlank(message = "Mật khẩu không được để trống")
-        @Length(min = 8, max = 255, message = "Mật khẩu không được vượt quá 255 ký tự")
-        String password
+        @Schema(description = "Thời gian vào làm", example = "2026-10-19")
+        LocalDate hiredDate,
+
+        @Schema(description = "Vai trò", example = "ADMIN")
+        Role role
 ) {}
