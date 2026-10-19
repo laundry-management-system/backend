@@ -145,6 +145,12 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
+    public UserResponse getMyProfile(String username){
+        return UserResponse.from(userRepository.findByUsername(username)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy thông tin người dùng")));
+    }
+
+    @Transactional(readOnly = true)
     public Page<UserResponse> getAllUsers(Status status, String keyword, Pageable pageable){
         String normalizedKeyword = (keyword == null || keyword.isBlank()) ? "" : keyword.trim();
         return userRepository.findAllByParam(status, normalizedKeyword, pageable)

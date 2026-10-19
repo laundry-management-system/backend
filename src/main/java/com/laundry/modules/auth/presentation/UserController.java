@@ -41,10 +41,17 @@ public class UserController {
         return userService.getUserById(userId);
     }
 
+    @Operation(summary = "Lấy thông tin của bản thân", description = "API lấy thông tin của chủ sở hữu token")
+    @GetMapping("/me")
+    @ResponseStatus(HttpStatus.OK)
+    public UserResponse getMyProfile(Authentication authentication) {
+        return userService.getMyProfile(authentication.getName());
+    }
+
     @Operation(
       summary = "Lấy thông tin tất cả nhân viên có filter",
       description = "API lấy thông tin tất cả nhân viên lọc theo trạng thái (status), từ khóa (mã nhân viên, họ tên, số điện thoại), có phân trang"
-  )
+    )
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasRole('ADMIN')")
