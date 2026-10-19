@@ -25,6 +25,9 @@ public class User extends BaseEntity {
     @Column(name = "phone", nullable = false, unique = true,length = 10)
     String phone;
 
+    @Column(name = "email", nullable = false, unique = true)
+    String email;
+
     @Column(name = "username", nullable = false, unique = true, length = 50)
     String username;
 
@@ -49,10 +52,16 @@ public class User extends BaseEntity {
         this.fullName = fullName;
         this.phone = phone;
     }
+
     public void disable(){
         this.status = Status.INACTIVE;
     }
+
     public void enable(){
         this.status = Status.ACTIVE;
+    }
+
+    public void setupPassword(String passwordHash){
+        this.passwordHash = passwordHash;
     }
 }

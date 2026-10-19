@@ -2,6 +2,7 @@ package com.laundry.modules.auth.presentation;
 
 import com.laundry.modules.auth.application.UserService;
 import com.laundry.modules.auth.application.dto.CreateUserRequest;
+import com.laundry.modules.auth.application.dto.SetupPasswordRequest;
 import com.laundry.modules.auth.application.dto.UpdateUserRequest;
 import com.laundry.modules.auth.application.dto.UserResponse;
 import com.laundry.modules.auth.domain.Status;
@@ -50,7 +51,7 @@ public class UserController {
 
     @Operation(
       summary = "Lấy thông tin tất cả nhân viên có filter",
-      description = "API lấy thông tin tất cả nhân viên lọc theo trạng thái (status), từ khóa (mã nhân viên, họ tên, số điện thoại), có phân trang"
+      description = "API lấy thông tin tất cả nhân viên lọc theo trạng thái (status), từ khóa (mã nhân viên, họ tên, số điện thoại, email), có phân trang"
     )
     @GetMapping
     @ResponseStatus(HttpStatus.OK)
@@ -92,5 +93,20 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public void enableUser(@PathVariable Long userId) {
         userService.enableUser(userId);
+    }
+
+    @Operation(summary = "Gửi lại mail setup tài khoản", description = "API cho phép ADMIN gửi lại mail setup tài khoản cho nhân viên")
+    @PostMapping("/{id}/resend-setup-mail")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN')")
+    public void resendSetupMail(@PathVariable("id") Long userId) {
+        userService.resend(userId);
+    }
+
+    @Operation(summary = "Thiết lập mật khẩu", description = "API cho phép nhân viên thiết lập mật khẩu")
+    @PostMapping("/setup-password")
+    @ResponseStatus(HttpStatus.OK)
+    public void setupPassword(@RequestParam String token, @RequestBody SetupPasswordRequest request){
+        userService.setupPassword(token, request);
     }
 }

@@ -1,5 +1,6 @@
 package com.laundry.modules.auth.domain;
 
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,8 +11,6 @@ import org.springframework.data.repository.query.Param;
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
 
-    Optional<User> findByPhone(String phone);
-
     @Query(
         """
         select u from User u
@@ -19,7 +18,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 (   :keyword is null or
                     u.employeeCode like concat('%', :keyword, '%') or
                     u.fullName like concat('%', :keyword, '%') or
-                    u.phone like concat('%', :keyword, '%')
+                    u.phone like concat('%', :keyword, '%') or
+                    u.email like concat('%', :keyword, '%')
                 )
         """
       )
@@ -27,11 +27,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
                               @Param("keyword") String keyword,
                               Pageable pageable);
 
-    boolean existsByUsername(String username);
     boolean existsByPhone(String phone);
+    boolean existsByEmail(String email);
 
     @Query(value = "SELECT nextval('employee_code_seq')", nativeQuery = true)
     Long nextEmployeeSeq();
 
-
+    @Query("SELECT u.username FROM User u WHERE u.username LIKE :prefix")
+    List<String> findUsernamesStartingWith(@Param("prefix") String prefix);
 }
