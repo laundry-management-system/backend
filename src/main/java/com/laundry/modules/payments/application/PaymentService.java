@@ -69,9 +69,7 @@ public class PaymentService {
             throw new BusinessException("VIETQR_ACCOUNT_NO phải có từ 6 đến 19 chữ hoặc số");
         }
 
-        // VietQR Quick Link descriptions allow alphanumeric text. Removing the display
-        // punctuation keeps the transfer memo unambiguous and within the provider contract.
-        String transferContent = order.orderCode().replaceAll("[^A-Za-z0-9]", "");
+        String transferContent = order.orderCode();
         String imageUrl = UriComponentsBuilder.fromUriString(vietQrProperties.getImageBaseUrl())
                 .pathSegment(bankId + "-" + accountNo + "-" + template + ".svg")
                 .queryParam("amount", amountText)
@@ -122,7 +120,7 @@ public class PaymentService {
 
     @Transactional
     public PaymentResponse resolve(String orderCode, long paymentId, ResolvePaymentRequest request,
-                                   String username, String ipAddress) {
+            String username, String ipAddress) {
         OrderSnapshot order = orderIntegration.lockByCode(orderCode);
         Payment payment = paymentRepository.findByIdAndOrderId(paymentId, order.id())
                 .orElseThrow(() -> NotFoundException.of("Giao dịch thanh toán", paymentId));
