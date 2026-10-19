@@ -21,6 +21,20 @@ app:
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
+  payment:
+    vietqr:
+      bank-id: ${VIETQR_BANK_ID:}
+      account-no: ${VIETQR_ACCOUNT_NO:}
+      account-name: ${VIETQR_ACCOUNT_NAME:}
+      template: ${VIETQR_TEMPLATE:compact2}
+      image-base-url: ${VIETQR_IMAGE_BASE_URL:https://img.vietqr.io/image}
+  public-lookup:
+    max-attempts: ${PUBLIC_LOOKUP_MAX_ATTEMPTS:10}
+    window-seconds: ${PUBLIC_LOOKUP_WINDOW_SECONDS:60}
+  orders:
+    overdue-days: ${ORDER_OVERDUE_DAYS:7}
+  frontend:
+    public-lookup-url: ${PUBLIC_LOOKUP_URL:http://localhost:5173/track-order}
 
 springdoc:
   swagger-ui:
