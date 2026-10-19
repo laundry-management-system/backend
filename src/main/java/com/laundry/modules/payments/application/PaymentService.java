@@ -13,6 +13,7 @@ import com.laundry.modules.payments.application.port.OrderIntegration;
 import com.laundry.modules.payments.application.port.OrderSnapshot;
 import com.laundry.modules.payments.domain.Payment;
 import com.laundry.modules.payments.domain.PaymentRepository;
+import com.laundry.modules.payments.domain.PaymentResolution;
 import com.laundry.modules.payments.domain.PaymentStatus;
 import com.laundry.modules.payments.infrastructure.VietQrProperties;
 import lombok.RequiredArgsConstructor;
@@ -130,7 +131,10 @@ public class PaymentService {
         payment.resolve(request.resolution(), adminId, now, request.reason().trim());
         paymentRepository.saveAndFlush(payment);
         orderIntegration.setPaymentStatus(order.id(), false);
-        auditLogPort.record(adminId, "PAYMENT_VOID", "payment", payment.getId(),
+        String auditAction = request.resolution() == PaymentResolution.REFUNDED
+                ? "PAYMENT_REFUND"
+                : "PAYMENT_VOID";
+        auditLogPort.record(adminId, auditAction, "payment", payment.getId(),
                 "{\"status\":\"" + previousStatus + "\"}",
                 "{\"status\":\"" + payment.getStatus() + "\"}",
                 request.reason().trim(), ipAddress);
