@@ -31,7 +31,7 @@ public class CustomerService {
         }
 
         Customer customer = Customer.builder()
-                .customerCode("TPM-"+ UUID.randomUUID())
+                .customerCode("TMP" + UUID.randomUUID().toString().replace("-", "").substring(0, 8))
                 .fullName(request.fullName().trim())
                 .phone(phone)
                 .address(request.address() != null ? request.address().trim() : null)

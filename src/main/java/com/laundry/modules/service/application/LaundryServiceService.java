@@ -44,7 +44,7 @@ public class LaundryServiceService {
     @Transactional
     public ServiceResponse createService(CreateServiceRequest request) {
         LaundryService service = LaundryService.builder()
-                .serviceCode("TPM-"+ UUID.randomUUID())
+                .serviceCode("TMP" + UUID.randomUUID().toString().replace("-", "").substring(0, 6))
                 .name(request.name().trim())
                 .unit(request.unit())
                 .currentPrice(request.currentPrice())
@@ -84,8 +84,12 @@ public class LaundryServiceService {
             service.setExpressSupported(request.expressSupported());
         }
 
-        service.setExpressSurcharge(request.expressSurcharge());
-        service.setExpressHours(request.expressHours());
+        if (request.expressSurcharge() != null || (request.expressSupported() != null && !request.expressSupported())) {
+            service.setExpressSurcharge(request.expressSurcharge());
+        }
+        if (request.expressHours() != null || (request.expressSupported() != null && !request.expressSupported())) {
+            service.setExpressHours(request.expressHours());
+        }
 
         service.validateBusinessRules();
 

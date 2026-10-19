@@ -25,7 +25,7 @@ public record ServiceResponse(
                 service.getId(),
                 service.getServiceCode(),
                 service.getName(),
-                service.getUnit().getDisplayName(),
+                service.getUnit() != null ? service.getUnit().getDisplayName() : null,
                 service.getCurrentPrice(),
                 service.getStandardHours(),
                 service.getExpressSupported(),

@@ -47,7 +47,7 @@ public class LaundryServiceController {
     }
 
     @Operation(summary = "Get service details by code (DVxx)")
-    @GetMapping("/code/{code}")
+    @GetMapping("/by-code/{code}")
     public ServiceResponse getServiceByCode(@PathVariable String code) {
         return laundryServiceService.getServiceByCode(code);
     }
