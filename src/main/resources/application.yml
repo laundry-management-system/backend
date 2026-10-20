@@ -43,7 +43,7 @@ springdoc:
 mailjet:
   api-key: ${MAILJET_API_KEY:0cb65a9c47221ca2f997c1ef234955c1}
   secret-key: ${MAILJET_SECRET_KEY:8f0ab74011ee3a59d416689dd1fab681}
-  sender-email: ${MAILJET_SENDER_EMAIL:phamvanthanhtunh2006@gmail.com}
+  sender-email: ${MAILJET_SENDER_EMAIL:phamvanthanhtung2006@gmail.com}
   sender-name: Laundry
 
 logging:
