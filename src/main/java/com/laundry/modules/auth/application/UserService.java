@@ -10,8 +10,6 @@ import com.laundry.modules.auth.domain.Role;
 import com.laundry.modules.auth.domain.Status;
 import com.laundry.modules.auth.domain.User;
 import com.laundry.modules.auth.domain.UserRepository;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -45,22 +43,20 @@ public class UserService {
         }
 
         try{
-            LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
             String passwordHash = passwordEncoder.encode(UUID.randomUUID().toString());
             String username = usernameGenerator.generate(createUserRequest.fullName());
 
-      User user =
-          User.builder()
-              .employeeCode(employeeCodeGenerator.next())
-              .fullName(createUserRequest.fullName())
-              .phone(createUserRequest.phone())
-              .email(createUserRequest.email())
-              .username(username)
-              .passwordHash(passwordHash)
-              .role(createUserRequest.role())
-              .status(Status.INACTIVE)
-              .hiredDate(today)
-              .build();
+            User user = User.builder()
+                  .employeeCode(employeeCodeGenerator.next())
+                  .fullName(createUserRequest.fullName())
+                  .phone(createUserRequest.phone())
+                  .email(createUserRequest.email())
+                  .username(username)
+                  .passwordHash(passwordHash)
+                  .role(createUserRequest.role())
+                  .status(Status.INACTIVE)
+                  .hiredDate(createUserRequest.hiredDate())
+                  .build();
 
             userRepository.save(user);
 
@@ -87,7 +83,12 @@ public class UserService {
         }
 
         try{
-            user.updateProfile(updateUserRequest.fullName(), updateUserRequest.phone());
+            user.updateProfile(
+                    updateUserRequest.fullName(),
+                    updateUserRequest.phone(),
+                    updateUserRequest.hiredDate()
+            );
+
             userRepository.save(user);
             return UserResponse.from(user);
         } catch (DataIntegrityViolationException e) {
@@ -109,7 +110,12 @@ public class UserService {
         }
 
         try{
-            user.updateProfile(updateUserRequest.fullName(), updateUserRequest.phone());
+            user.updateProfile(
+                    updateUserRequest.fullName(),
+                    updateUserRequest.phone(),
+                    updateUserRequest.hiredDate()
+            );
+
             userRepository.save(user);
             return UserResponse.from(user);
         } catch (DataIntegrityViolationException e) {
