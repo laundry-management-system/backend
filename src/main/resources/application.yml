@@ -33,23 +33,22 @@ app:
     same-site: ${REFRESH_COOKIE_SAME_SITE}
     max-age: ${REFRESH_COOKIE_MAX_AGE}
   cors:
-    allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
+    allowed-origins: ${CORS_ORIGINS}
   payment:
     vietqr:
-      bank-id: ${VIETQR_BANK_ID:}
-      account-no: ${VIETQR_ACCOUNT_NO:}
-      account-name: ${VIETQR_ACCOUNT_NAME:}
-      template: ${VIETQR_TEMPLATE:compact2}
-      image-base-url: ${VIETQR_IMAGE_BASE_URL:https://img.vietqr.io/image}
+      bank-id: ${VIETQR_BANK_ID}
+      account-no: ${VIETQR_ACCOUNT_NO}
+      account-name: ${VIETQR_ACCOUNT_NAME}
+      template: ${VIETQR_TEMPLATE}
+      image-base-url: ${VIETQR_IMAGE_BASE_URL}
   public-lookup:
-    max-attempts: ${PUBLIC_LOOKUP_MAX_ATTEMPTS:10}
-    window-seconds: ${PUBLIC_LOOKUP_WINDOW_SECONDS:60}
+    max-attempts: ${PUBLIC_LOOKUP_MAX_ATTEMPTS}
+    window-seconds: ${PUBLIC_LOOKUP_WINDOW_SECONDS}
   orders:
-    overdue-days: ${ORDER_OVERDUE_DAYS:7}
+    overdue-days: ${ORDER_OVERDUE_DAYS}
   frontend:
-    public-lookup-url: ${PUBLIC_LOOKUP_URL:http://localhost:5173/track-order}
-    allowed-origins: ${CORS_ORIGINS}
-  front-end-setup-password-url: ${FRONT_END_SETUP_PASSWORD_URL} # TODO: Gắn link trang nhập mật khẩu vào biến
+    public-lookup-url: ${PUBLIC_LOOKUP_URL}
+    setup-password-url: ${SETUP_PASSWORD_URL} # TODO: Gắn link trang nhập mật khẩu vào biến
 
 springdoc:
   swagger-ui:
