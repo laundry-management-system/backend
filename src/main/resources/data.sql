@@ -1,5 +1,6 @@
--- Dữ liệu mẫu (tài khoản admin, danh mục...) chạy sau khi Hibernate tạo bảng.
--- Chưa có bảng nghiệp vụ nên để trống; thêm INSERT ... ON CONFLICT DO NOTHING khi có module.
+-- Schema and indexes are installed separately by the database migration.
+-- Keep this initializer harmless when the application connects with a
+-- restricted runtime role that must not own or alter shared tables.
 SELECT 1;
 
 CREATE SEQUENCE IF NOT EXISTS employee_code_seq START WITH 2;

@@ -27,6 +27,16 @@ public class GlobalExceptionHandler {
         return problem(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
+    @ExceptionHandler(ResourceConflictException.class)
+    public ProblemDetail handleConflict(ResourceConflictException ex) {
+        return problem(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ProblemDetail handleTooManyRequests(TooManyRequestsException ex) {
+        return problem(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> errors = new LinkedHashMap<>();
