@@ -162,7 +162,8 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public Page<UserResponse> getAllUsers(Status status, String keyword, Pageable pageable){
-        return userRepository.findAllByParam(status, keyword.trim(), pageable)
+        String normalizedKeyword = keyword == null ? null: keyword.trim();
+        return userRepository.findAllByParam(status, normalizedKeyword, pageable)
                 .map(UserResponse::from);
     }
 
