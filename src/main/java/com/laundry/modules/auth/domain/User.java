@@ -48,9 +48,10 @@ public class User extends BaseEntity {
     public boolean isActive(){
         return this.status.equals(Status.ACTIVE);
     }
-    public void updateProfile(String fullName, String phone){
+    public void updateProfile(String fullName, String phone, LocalDate hiredDate){
         this.fullName = fullName;
         this.phone = phone;
+        this.hiredDate = hiredDate;
     }
 
     public void disable(){

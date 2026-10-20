@@ -5,6 +5,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import org.hibernate.validator.constraints.Length;
 
+import java.time.LocalDate;
+
 @Schema(description = "Request cập nhật thông tin nhân viên")
 public record UpdateUserRequest(
         @Schema(description = "Họ và tên nhân viên", example = "Nguyễn Văn A")
@@ -19,5 +21,8 @@ public record UpdateUserRequest(
                 regexp = "^0\\d{9}$",
                 message = "Số điện thoại phải gồm 10 chữ số và bắt đầu bằng 0"
         )
-        String phone
+        String phone,
+
+        @Schema(description = "Ngày vào làm của nhân viên", example = "2026-10-20")
+        LocalDate hiredDate
 ) {}
