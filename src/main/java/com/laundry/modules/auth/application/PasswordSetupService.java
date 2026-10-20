@@ -3,7 +3,6 @@
 import com.laundry.common.exception.BusinessException;
 import com.laundry.modules.auth.application.dto.PasswordSetupRequestedEvent;
 import com.laundry.modules.auth.domain.User;
-import com.laundry.modules.auth.domain.UserRepository;
 import java.time.Duration;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -29,7 +28,7 @@ public class PasswordSetupService {
     StringRedisTemplate redis;
 
     @NonFinal
-    @Value("${app.front-end-setup-password-url}")
+    @Value("${app.frontend.setup-password-url}")
     String frontendUrl;
 
     @Transactional
