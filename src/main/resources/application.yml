@@ -34,7 +34,7 @@ app:
     max-age: ${REFRESH_COOKIE_MAX_AGE:7}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
-  front-end-setup-password-url: ${FRONT_END_SETUP_PASSWORD_URL} # TODO: Gắn link trang nhập mật khẩu vào biến
+    front-end-setup-password-url: ${FRONT_END_SETUP_PASSWORD_URL} # TODO: Gắn link trang nhập mật khẩu vào biến
 
 springdoc:
   swagger-ui:
