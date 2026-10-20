@@ -25,7 +25,7 @@ import java.util.Optional;
 public class JpaOrderIntegrationAdapter implements OrderIntegration {
 
     private static final String ORDER_SELECT = """
-            SELECT o.id, o.order_code, o.customer_id, c.full_name, c.phone,
+            SELECT o.id, o.order_code, o.customer_id, c.full_name, BTRIM(c.phone),
                    o.received_at, o.due_at, o.total_amount, o.status, o.payment_status,
                    o.completed_at, o.shelf_location, o.delivered_at, o.delivered_by,
                    o.receiver_name, o.receiver_relation, o.last_notified_at,
