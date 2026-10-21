@@ -29,6 +29,7 @@ public class SecurityConfig {
             "/api/health",
             "/api/auth/**",
             "/api/users/setup-password",
+            "/api/public/orders/lookup",
             "/swagger-ui.html",
             "/swagger-ui/**",
             "/v3/api-docs/**",
