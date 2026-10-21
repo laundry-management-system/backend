@@ -2,13 +2,12 @@ package com.laundry.modules.health.application;
 
 import com.laundry.modules.health.application.dto.HealthResponse;
 import com.laundry.modules.health.domain.HealthStatus;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-
-import java.time.Instant;
 
 @Slf4j
 @Service
