@@ -93,6 +93,10 @@ public class LaundryServiceService {
 
         service.validateBusinessRules();
 
+        if (request.status() != null && request.status() != service.getStatus()) {
+            applyStatus(service, request.status());
+        }
+
         this.serviceRepository.save(service);
 
         return ServiceResponse.from(service);
@@ -103,13 +107,17 @@ public class LaundryServiceService {
         LaundryService service = serviceRepository.findById(id)
                 .orElseThrow(() -> NotFoundException.of("Dịch vụ", id));
 
+        applyStatus(service, status);
+
+        LaundryService saved = serviceRepository.save(service);
+        return ServiceResponse.from(saved);
+    }
+
+    private void applyStatus(LaundryService service, ServiceStatus status) {
         if (status == ServiceStatus.INACTIVE) {
             service.deactivate();
         } else if (status == ServiceStatus.ACTIVE) {
             service.activate();
         }
-
-        LaundryService saved = serviceRepository.save(service);
-        return ServiceResponse.from(saved);
     }
 }

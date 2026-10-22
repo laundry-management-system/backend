@@ -1,5 +1,6 @@
 package com.laundry.modules.service.application.dto;
 
+import com.laundry.modules.service.domain.ServiceStatus;
 import com.laundry.modules.service.domain.ServiceUnit;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -25,5 +26,8 @@ public record UpdateServiceRequest(
         BigDecimal expressSurcharge,
 
         @Min(value = 1, message = "Thời gian giặt nhanh phải lớn hơn 0 giờ")
-        Integer expressHours
+        Integer expressHours,
+
+        // Tùy chọn: đổi trạng thái cùng lúc với thông tin, khỏi gọi thêm PATCH /status
+        ServiceStatus status
 ) {}
