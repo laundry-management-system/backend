@@ -8,22 +8,22 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
 public record UpdateServiceRequest(
-        @Size(max = 100, message = "Service name must not exceed 100 characters")
+        @Size(max = 100, message = "Tên dịch vụ tối đa 100 ký tự")
         String name,
 
         ServiceUnit unit,
 
-        @DecimalMin(value = "0", message = "Price must be greater than or equal to 0")
+        @DecimalMin(value = "0", message = "Đơn giá không được âm")
         BigDecimal currentPrice,
 
-        @Min(value = 1, message = "Standard processing time must be greater than 0 hours")
+        @Min(value = 1, message = "Thời gian xử lý chuẩn phải lớn hơn 0 giờ")
         Integer standardHours,
 
         Boolean expressSupported,
 
-        @DecimalMin(value = "0", message = "Express surcharge must be greater than or equal to 0")
+        @DecimalMin(value = "0", message = "Phụ phí giặt nhanh không được âm")
         BigDecimal expressSurcharge,
 
-        @Min(value = 1, message = "Express processing time must be greater than 0 hours")
+        @Min(value = 1, message = "Thời gian giặt nhanh phải lớn hơn 0 giờ")
         Integer expressHours
 ) {}

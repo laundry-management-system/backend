@@ -31,14 +31,14 @@ public class LaundryServiceService {
     public ServiceResponse getServiceById(Long id) {
         return serviceRepository.findById(id)
                 .map(ServiceResponse::from)
-                .orElseThrow(() -> new NotFoundException("Service not found with ID: " + id));
+                .orElseThrow(() -> NotFoundException.of("Dịch vụ", id));
     }
 
     public ServiceResponse getServiceByCode(String code) {
         String cleanCode = code != null ? code.trim() : "";
         return serviceRepository.findByServiceCode(cleanCode)
                 .map(ServiceResponse::from)
-                .orElseThrow(() -> new NotFoundException("Service not found with code: " + cleanCode));
+                .orElseThrow(() -> NotFoundException.of("Dịch vụ mã", cleanCode));
     }
 
     @Transactional
@@ -66,7 +66,7 @@ public class LaundryServiceService {
     @Transactional
     public ServiceResponse updateService(Long id, UpdateServiceRequest request) {
         LaundryService service = serviceRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Service not found with ID: " + id));
+                .orElseThrow(() -> NotFoundException.of("Dịch vụ", id));
 
         if (request.name() != null && !request.name().trim().isEmpty()) {
             service.setName(request.name().trim());
@@ -101,7 +101,7 @@ public class LaundryServiceService {
     @Transactional
     public ServiceResponse changeStatus(Long id, ServiceStatus status) {
         LaundryService service = serviceRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Service not found with ID: " + id));
+                .orElseThrow(() -> NotFoundException.of("Dịch vụ", id));
 
         if (status == ServiceStatus.INACTIVE) {
             service.deactivate();

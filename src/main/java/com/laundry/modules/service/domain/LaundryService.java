@@ -65,20 +65,20 @@ public class LaundryService extends BaseEntity {
 
     public void validateBusinessRules() {
         if (this.currentPrice == null || this.currentPrice.compareTo(BigDecimal.ZERO) < 0) {
-            throw new BusinessException("Service price must be greater than or equal to 0");
+            throw new BusinessException("Đơn giá không được âm");
         }
         if (this.standardHours == null || this.standardHours <= 0) {
-            throw new BusinessException("Standard processing time must be greater than 0 hours");
+            throw new BusinessException("Thời gian xử lý chuẩn phải lớn hơn 0 giờ");
         }
         if (Boolean.TRUE.equals(this.expressSupported)) {
             if (this.expressSurcharge == null || this.expressSurcharge.compareTo(BigDecimal.ZERO) < 0) {
-                throw new BusinessException("Express surcharge must be greater than or equal to 0");
+                throw new BusinessException("Phụ phí giặt nhanh không được âm");
             }
             if (this.expressHours == null || this.expressHours <= 0) {
-                throw new BusinessException("Express processing time must be greater than 0 hours");
+                throw new BusinessException("Thời gian giặt nhanh phải lớn hơn 0 giờ");
             }
             if (this.expressHours >= this.standardHours) {
-                throw new BusinessException("Express processing time (" + this.expressHours + "h) must be shorter than standard processing time (" + this.standardHours + "h) (BR-C06)");
+                throw new BusinessException("Thời gian giặt nhanh (" + this.expressHours + " giờ) phải ngắn hơn thời gian xử lý chuẩn (" + this.standardHours + " giờ)");
             }
         }
     }
@@ -114,14 +114,14 @@ public class LaundryService extends BaseEntity {
 
     public void deactivate() {
         if (this.status == ServiceStatus.INACTIVE) {
-            throw new BusinessException("Service is already inactive");
+            throw new BusinessException("Dịch vụ đã ở trạng thái Ngừng hoạt động");
         }
         this.status = ServiceStatus.INACTIVE;
     }
 
     public void activate() {
         if (this.status == ServiceStatus.ACTIVE) {
-            throw new BusinessException("Service is already active");
+            throw new BusinessException("Dịch vụ đã ở trạng thái Hoạt động");
         }
         this.status = ServiceStatus.ACTIVE;
     }
