@@ -10,15 +10,14 @@ import com.laundry.modules.auth.domain.Role;
 import com.laundry.modules.auth.domain.Status;
 import com.laundry.modules.auth.domain.User;
 import com.laundry.modules.auth.domain.UserRepository;
-
+import com.laundry.modules.log.application.AuditLogService;
+import com.laundry.modules.log.application.dto.AuditEntry;
+import com.laundry.modules.log.domain.AuditAction;
+import com.laundry.modules.log.domain.EntityType;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
-
-import com.laundry.modules.log.application.AuditLogService;
-import com.laundry.modules.log.application.dto.AuditEntry;
-import com.laundry.modules.log.domain.AuditAction;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -105,7 +104,7 @@ public class UserService {
 
         auditLogService.log(new AuditEntry(
                 auditAction,
-                "User",
+                EntityType.USER,
                 id,
                 oldD,
                 newD,

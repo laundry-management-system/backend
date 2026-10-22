@@ -1,6 +1,7 @@
 package com.laundry.modules.log.application.dto;
 
 import com.laundry.modules.log.domain.AuditAction;
+import com.laundry.modules.log.domain.EntityType;
 import java.util.Map;
 
 /**
@@ -16,7 +17,7 @@ import java.util.Map;
  */
 public record AuditEntry(
         AuditAction action,
-        String entityType,
+        EntityType entityType,
         Long entityId,
         Map<String, Object> oldData,
         Map<String, Object> newData,

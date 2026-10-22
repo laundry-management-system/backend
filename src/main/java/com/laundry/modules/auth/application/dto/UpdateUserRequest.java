@@ -3,9 +3,8 @@ package com.laundry.modules.auth.application.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
-import org.hibernate.validator.constraints.Length;
-
 import java.time.LocalDate;
+import org.hibernate.validator.constraints.Length;
 
 @Schema(description = "Request cập nhật thông tin nhân viên")
 public record UpdateUserRequest(

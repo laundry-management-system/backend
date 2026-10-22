@@ -11,6 +11,7 @@ import com.laundry.modules.auth.domain.UserRepository;
 import com.laundry.modules.log.application.AuditLogService;
 import com.laundry.modules.log.application.dto.AuditEntry;
 import com.laundry.modules.log.domain.AuditAction;
+import com.laundry.modules.log.domain.EntityType;
 import io.jsonwebtoken.Claims;
 import java.time.Duration;
 import java.time.Instant;
@@ -114,7 +115,7 @@ public class AuthService {
 
             auditLogService.log(new AuditEntry(
                     AuditAction.ACCOUNT_LOCKED,
-                    "User",
+                    EntityType.AUTH,
                     resolver.resolveId(username),
                     null,
                     null,

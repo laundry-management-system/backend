@@ -32,8 +32,9 @@ public class AuditLog extends BaseEntity {
     @Column(name = "action", nullable = false, length = 40)
     AuditAction action;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "entity_type", nullable = false, length = 30)
-    String entityType;
+    EntityType entityType;
 
     @Column(name = "entity_id", nullable = false)
     Long entityId;
