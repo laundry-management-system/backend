@@ -3,10 +3,9 @@ package com.laundry.modules.payments.infrastructure;
 import com.laundry.common.exception.NotFoundException;
 import com.laundry.common.security.ActorIdResolver;
 import jakarta.persistence.EntityManager;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -25,7 +24,7 @@ public class JpaActorIdResolver implements ActorIdResolver {
             if (userIds.isEmpty()) {
                 throw NotFoundException.of("User", username);
             }
-            return ((Number) userIds.get(0)).longValue();
+            return ((Number) userIds.getFirst()).longValue();
         }
     }
 }

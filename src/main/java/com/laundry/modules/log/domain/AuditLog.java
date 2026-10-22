@@ -1,10 +1,7 @@
 package com.laundry.modules.log.domain;
 
 import com.laundry.common.entity.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Index;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import java.util.Map;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -31,8 +28,9 @@ public class AuditLog extends BaseEntity {
     @Column(name = "user_id", nullable = false)
     Long userId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "action", nullable = false, length = 40)
-    String action;
+    AuditAction action;
 
     @Column(name = "entity_type", nullable = false, length = 30)
     String entityType;
@@ -53,5 +51,6 @@ public class AuditLog extends BaseEntity {
 
     @Column(name = "ip_address", length = 45)
     String ipAddress;
+
 
 }
