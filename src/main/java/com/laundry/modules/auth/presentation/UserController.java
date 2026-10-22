@@ -38,6 +38,7 @@ public class UserController {
     @Operation(summary = "Lấy thông tin nhân viên", description = "API lấy thông tin nhân viên theo ID")
     @GetMapping("/{userId}")
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN')")
     public UserResponse getUserById(@PathVariable Long userId) {
         return userService.getUserById(userId);
     }
@@ -106,7 +107,7 @@ public class UserController {
     @Operation(summary = "Thiết lập mật khẩu", description = "API cho phép nhân viên thiết lập mật khẩu")
     @PostMapping("/setup-password")
     @ResponseStatus(HttpStatus.OK)
-    public void setupPassword(@RequestParam String token, @RequestBody SetupPasswordRequest request){
+    public void setupPassword(@RequestParam String token, @RequestBody @Valid SetupPasswordRequest request){
         userService.setupPassword(token, request);
     }
 }
