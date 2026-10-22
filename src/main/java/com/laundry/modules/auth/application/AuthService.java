@@ -2,11 +2,15 @@ package com.laundry.modules.auth.application;
 
 import com.laundry.common.exception.BusinessException;
 import com.laundry.common.exception.NotFoundException;
+import com.laundry.common.security.ActorIdResolver;
 import com.laundry.common.security.JwtUtil;
 import com.laundry.modules.auth.application.dto.AuthDTO;
 import com.laundry.modules.auth.application.dto.LoginRequest;
 import com.laundry.modules.auth.domain.User;
 import com.laundry.modules.auth.domain.UserRepository;
+import com.laundry.modules.log.application.AuditLogService;
+import com.laundry.modules.log.application.dto.AuditEntry;
+import com.laundry.modules.log.domain.AuditAction;
 import io.jsonwebtoken.Claims;
 import java.time.Duration;
 import java.time.Instant;
@@ -31,6 +35,8 @@ public class AuthService {
     JwtUtil jwtUtil;
     StringRedisTemplate stringRedisTemplate;
     UserRepository userRepository;
+    AuditLogService auditLogService;
+    ActorIdResolver resolver;
 
     String loginAttemptKeyPrefix = "laundry:auth:login:attempt:";
     String lockKeyPrefix = "laundry:auth:isLocked:";
@@ -105,6 +111,15 @@ public class AuthService {
         if(attempts >= maxAttempts){
             stringRedisTemplate.opsForValue().set(lockKeyPrefix + username, "true", Duration.ofMinutes(15));
             stringRedisTemplate.delete(loginAttemptKeyPrefix + username);
+
+            auditLogService.log(new AuditEntry(
+                    AuditAction.ACCOUNT_LOCKED,
+                    "User",
+                    resolver.resolveId(username),
+                    null,
+                    null,
+                    "Đăng nhập sai quá số lần quy định"
+            ));
         }
     }
 

@@ -48,18 +48,22 @@ public class User extends BaseEntity {
     public boolean isActive(){
         return this.status.equals(Status.ACTIVE);
     }
-    public void updateProfile(String fullName, String phone, LocalDate hiredDate){
+    public User updateProfile(String fullName, String phone, LocalDate hiredDate){
         this.fullName = fullName;
         this.phone = phone;
         this.hiredDate = hiredDate;
+
+        return this;
     }
 
-    public void disable(){
+    public User disable(){
         this.status = Status.INACTIVE;
+        return this;
     }
 
-    public void enable(){
+    public User enable(){
         this.status = Status.ACTIVE;
+        return this;
     }
 
     public void setupPassword(String passwordHash){
