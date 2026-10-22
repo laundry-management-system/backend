@@ -5,10 +5,15 @@ import com.laundry.modules.service.application.dto.ChangeServiceStatusRequest;
 import com.laundry.modules.service.application.dto.CreateServiceRequest;
 import com.laundry.modules.service.application.dto.ServiceResponse;
 import com.laundry.modules.service.application.dto.UpdateServiceRequest;
+import com.laundry.modules.service.domain.ServiceStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,12 +37,21 @@ public class LaundryServiceController {
 
     private final LaundryServiceService laundryServiceService;
 
-    @Operation(summary = "View service catalog and active price list (Staff & Admin)")
+    @Operation(summary = "Price list (paged): search by code/name, filter by status (Staff & Admin)")
     @GetMapping
-    public List<ServiceResponse> getAllServices(
-            @RequestParam(required = false, defaultValue = "false") Boolean activeOnly
+    public Page<ServiceResponse> listServices(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) ServiceStatus status,
+            // Sắp theo id: mã DVxx là chuỗi, sort theo mã sẽ đặt DV100 trước DV11
+            @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable
     ) {
-        return laundryServiceService.getAllServices(activeOnly);
+        return laundryServiceService.listServices(search, status, pageable);
+    }
+
+    @Operation(summary = "All active services, for the service picker when classifying orders")
+    @GetMapping("/active")
+    public List<ServiceResponse> listActiveServices() {
+        return laundryServiceService.listActiveServices();
     }
 
     @Operation(summary = "Get service details by ID")

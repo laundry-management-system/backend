@@ -8,6 +8,8 @@ import com.laundry.modules.service.domain.LaundryService;
 import com.laundry.modules.service.domain.LaundryServiceRepository;
 import com.laundry.modules.service.domain.ServiceStatus;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,12 +22,16 @@ public class LaundryServiceService {
 
     private final LaundryServiceRepository serviceRepository;
 
-    public List<ServiceResponse> getAllServices(Boolean activeOnly) {
-        List<LaundryService> list = Boolean.TRUE.equals(activeOnly)
-                ? serviceRepository.findByStatusOrderByServiceCodeAsc(ServiceStatus.ACTIVE)
-                : serviceRepository.findAllByOrderByServiceCodeAsc();
+    public Page<ServiceResponse> listServices(String search, ServiceStatus status, Pageable pageable) {
+        String term = search != null ? search.trim() : "";
+        return serviceRepository.searchServices(term, status, pageable).map(ServiceResponse::from);
+    }
 
-        return list.stream().map(ServiceResponse::from).toList();
+    /** Toàn bộ dịch vụ đang hoạt động, cho ô chọn dịch vụ khi phân loại đơn. */
+    public List<ServiceResponse> listActiveServices() {
+        return serviceRepository.findByStatusOrderByServiceCodeAsc(ServiceStatus.ACTIVE).stream()
+                .map(ServiceResponse::from)
+                .toList();
     }
 
     public ServiceResponse getServiceById(Long id) {
