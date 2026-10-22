@@ -8,6 +8,8 @@ import com.laundry.modules.service.domain.LaundryService;
 import com.laundry.modules.service.domain.LaundryServiceRepository;
 import com.laundry.modules.service.domain.ServiceStatus;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,25 +22,29 @@ public class LaundryServiceService {
 
     private final LaundryServiceRepository serviceRepository;
 
-    public List<ServiceResponse> getAllServices(Boolean activeOnly) {
-        List<LaundryService> list = Boolean.TRUE.equals(activeOnly)
-                ? serviceRepository.findByStatusOrderByServiceCodeAsc(ServiceStatus.ACTIVE)
-                : serviceRepository.findAllByOrderByServiceCodeAsc();
+    public Page<ServiceResponse> listServices(String search, ServiceStatus status, Pageable pageable) {
+        String term = search != null ? search.trim() : "";
+        return serviceRepository.searchServices(term, status, pageable).map(ServiceResponse::from);
+    }
 
-        return list.stream().map(ServiceResponse::from).toList();
+    /** Toàn bộ dịch vụ đang hoạt động, cho ô chọn dịch vụ khi phân loại đơn. */
+    public List<ServiceResponse> listActiveServices() {
+        return serviceRepository.findByStatusOrderByServiceCodeAsc(ServiceStatus.ACTIVE).stream()
+                .map(ServiceResponse::from)
+                .toList();
     }
 
     public ServiceResponse getServiceById(Long id) {
         return serviceRepository.findById(id)
                 .map(ServiceResponse::from)
-                .orElseThrow(() -> new NotFoundException("Service not found with ID: " + id));
+                .orElseThrow(() -> NotFoundException.of("Dịch vụ", id));
     }
 
     public ServiceResponse getServiceByCode(String code) {
         String cleanCode = code != null ? code.trim() : "";
         return serviceRepository.findByServiceCode(cleanCode)
                 .map(ServiceResponse::from)
-                .orElseThrow(() -> new NotFoundException("Service not found with code: " + cleanCode));
+                .orElseThrow(() -> NotFoundException.of("Dịch vụ mã", cleanCode));
     }
 
     @Transactional
@@ -66,7 +72,7 @@ public class LaundryServiceService {
     @Transactional
     public ServiceResponse updateService(Long id, UpdateServiceRequest request) {
         LaundryService service = serviceRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Service not found with ID: " + id));
+                .orElseThrow(() -> NotFoundException.of("Dịch vụ", id));
 
         if (request.name() != null && !request.name().trim().isEmpty()) {
             service.setName(request.name().trim());
@@ -93,6 +99,10 @@ public class LaundryServiceService {
 
         service.validateBusinessRules();
 
+        if (request.status() != null && request.status() != service.getStatus()) {
+            applyStatus(service, request.status());
+        }
+
         this.serviceRepository.save(service);
 
         return ServiceResponse.from(service);
@@ -101,15 +111,19 @@ public class LaundryServiceService {
     @Transactional
     public ServiceResponse changeStatus(Long id, ServiceStatus status) {
         LaundryService service = serviceRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Service not found with ID: " + id));
+                .orElseThrow(() -> NotFoundException.of("Dịch vụ", id));
 
+        applyStatus(service, status);
+
+        LaundryService saved = serviceRepository.save(service);
+        return ServiceResponse.from(saved);
+    }
+
+    private void applyStatus(LaundryService service, ServiceStatus status) {
         if (status == ServiceStatus.INACTIVE) {
             service.deactivate();
         } else if (status == ServiceStatus.ACTIVE) {
             service.activate();
         }
-
-        LaundryService saved = serviceRepository.save(service);
-        return ServiceResponse.from(saved);
     }
 }

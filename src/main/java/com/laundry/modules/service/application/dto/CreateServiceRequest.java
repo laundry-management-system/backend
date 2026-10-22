@@ -10,26 +10,26 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
 public record CreateServiceRequest(
-        @NotBlank(message = "Service name must not be blank")
-        @Size(max = 100, message = "Service name must not exceed 100 characters")
+        @NotBlank(message = "Vui lòng nhập tên dịch vụ")
+        @Size(max = 100, message = "Tên dịch vụ tối đa 100 ký tự")
         String name,
 
-        @NotNull(message = "Service unit must not be null")
+        @NotNull(message = "Vui lòng chọn đơn vị tính")
         ServiceUnit unit,
 
-        @NotNull(message = "Current price must not be null")
-        @DecimalMin(value = "0", message = "Price must be greater than or equal to 0")
+        @NotNull(message = "Vui lòng nhập đơn giá")
+        @DecimalMin(value = "0", message = "Đơn giá không được âm")
         BigDecimal currentPrice,
 
-        @NotNull(message = "Standard processing time must not be null")
-        @Min(value = 1, message = "Standard processing time must be greater than 0 hours")
+        @NotNull(message = "Vui lòng nhập thời gian xử lý chuẩn")
+        @Min(value = 1, message = "Thời gian xử lý chuẩn phải lớn hơn 0 giờ")
         Integer standardHours,
 
         Boolean expressSupported,
 
-        @DecimalMin(value = "0", message = "Express surcharge must be greater than or equal to 0")
+        @DecimalMin(value = "0", message = "Phụ phí giặt nhanh không được âm")
         BigDecimal expressSurcharge,
 
-        @Min(value = 1, message = "Express processing time must be greater than 0 hours")
+        @Min(value = 1, message = "Thời gian giặt nhanh phải lớn hơn 0 giờ")
         Integer expressHours
 ) {}
