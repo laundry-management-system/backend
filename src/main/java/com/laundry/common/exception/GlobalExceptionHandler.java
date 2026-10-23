@@ -24,7 +24,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ProblemDetail handleBusiness(BusinessException ex) {
-        return problem(HttpStatus.BAD_REQUEST, ex.getMessage());
+        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, ex.getMessage());
+        if (ex.getField() != null) pd.setProperty("errors", Map.of(ex.getField(), ex.getMessage()));
+        return pd;
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
