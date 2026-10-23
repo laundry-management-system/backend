@@ -31,6 +31,8 @@ public class SecurityConfig {
             "/api/users/setup-password",
             "/api/orders/track",
             "/api/orders/track/**",
+            // Ảnh/file đã upload: <img> không gửi được JWT, tên file là UUID
+            "/api/documents/files/**",
             "/swagger-ui",
             "/swagger-ui.html",
             "/swagger-ui/**",

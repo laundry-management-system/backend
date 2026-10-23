@@ -5,6 +5,10 @@ spring:
     url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/laundry?options=-c%20TimeZone=Asia/Ho_Chi_Minh}
     username: ${DB_USERNAME:laundry}
     password: ${DB_PASSWORD:laundry}
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   jpa:
     hibernate:
       ddl-auto: update
@@ -23,6 +27,7 @@ spring:
       password: ${REDIS_PASSWORD:laundry}
 
 app:
+  upload-dir: ${UPLOAD_DIR:uploads}
   jwt:
     # Base64, >= 256 bit. Đổi qua biến môi trường JWT_SECRET khi deploy.
     secret: ${JWT_SECRET}
