@@ -20,11 +20,16 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     long countByCreatedAtBetween(Instant start, Instant end);
 
+    List<Order> findByIntakeRequestId(java.util.UUID intakeRequestId);
+
+    List<Order> findByIntakeCode(String intakeCode);
+
     @Query("""
         SELECT o FROM Order o
         WHERE (:status IS NULL OR o.status = :status)
           AND (:priority IS NULL OR o.priority = :priority)
           AND (:phone IS NULL OR o.customerPhone LIKE CONCAT('%', CAST(:phone AS string), '%'))
+          AND (:intakeCode IS NULL OR o.intakeCode = :intakeCode)
           AND (:search IS NULL OR LOWER(o.orderCode) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%') 
                                 OR LOWER(o.customerName) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%'))
     """)
@@ -33,6 +38,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             @Param("priority") OrderPriority priority,
             @Param("phone") String phone,
             @Param("search") String search,
+            @Param("intakeCode") String intakeCode,
             Pageable pageable
     );
 }
