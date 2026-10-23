@@ -21,10 +21,20 @@ public class CodeSequenceService {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public String getNextOrderCode() {
+        return next("ORDER", "LD");
+    }
+
+    /** Mã lượt nhận NH-yyyyMMdd-NNN: chung cho các đơn tạo trong một lần khách mang đồ đến. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public String getNextIntakeCode() {
+        return next("INTAKE", "NH");
+    }
+
+    private String next(String seqType, String prefix) {
         LocalDate today = LocalDate.now(VIETNAM_ZONE);
-        CodeSequence sequence = codeSequenceRepository.findBySeqTypeAndSeqDateForUpdate("ORDER", today)
+        CodeSequence sequence = codeSequenceRepository.findBySeqTypeAndSeqDateForUpdate(seqType, today)
                 .orElseGet(() -> CodeSequence.builder()
-                        .seqType("ORDER")
+                        .seqType(seqType)
                         .seqDate(today)
                         .lastNumber(0)
                         .build());
@@ -33,7 +43,7 @@ public class CodeSequenceService {
         codeSequenceRepository.save(sequence);
 
         String dateStr = today.format(DATE_FORMATTER);
-        return String.format("LD-%s-%03d", dateStr, nextNum);
+        return String.format("%s-%s-%03d", prefix, dateStr, nextNum);
     }
 }
 

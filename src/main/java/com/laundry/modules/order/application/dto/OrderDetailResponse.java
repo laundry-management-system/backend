@@ -46,10 +46,20 @@ public record OrderDetailResponse(
         String receiverRelation,
         List<OrderItemDto> items,
         List<OrderStatusHistoryResponse> historyList,
+        String intakeCode,
+        List<RequestedServiceDto> requestedServices,
+        Boolean washWhitesSeparately,
+        BigDecimal whitesFee,
         Instant createdAt,
         Instant updatedAt
 ) {
     public static OrderDetailResponse from(Order order) {
+        List<RequestedServiceDto> requested = order.getRequestedServiceIds() == null ? List.of()
+                : order.getRequestedServiceIds().stream().map(id -> new RequestedServiceDto(id, null, null)).toList();
+        return from(order, requested);
+    }
+
+    public static OrderDetailResponse from(Order order, List<RequestedServiceDto> requestedServices) {
         List<OrderItemDto> itemDtos = order.getItems() != null
                 ? order.getItems().stream().map(OrderItemDto::from).toList()
                 : List.of();
@@ -91,6 +101,10 @@ public record OrderDetailResponse(
                 order.getReceiverRelation(),
                 itemDtos,
                 historyDtos,
+                order.getIntakeCode(),
+                requestedServices,
+                order.getWashWhitesSeparately(),
+                order.getWhitesFee(),
                 order.getCreatedAt(),
                 order.getUpdatedAt()
         );
