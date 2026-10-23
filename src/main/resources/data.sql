@@ -30,3 +30,5 @@ SELECT v.* FROM (VALUES
     ('DV10', 'Balo / túi xách', 'PRODUCT', 80000, 1, 72, false, NULL::numeric, NULL::int, false, 'ACTIVE', NOW(), NOW())
 ) AS v
 WHERE NOT EXISTS (SELECT 1 FROM services);
+
+INSERT INTO settings (setting_key, setting_value) VALUES ('WHITES_FEE', '80000') ON CONFLICT DO NOTHING;
