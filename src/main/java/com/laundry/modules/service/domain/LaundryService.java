@@ -58,6 +58,15 @@ public class LaundryService extends BaseEntity {
     @Column(name = "express_hours")
     private Integer expressHours;
 
+    // Chỉ hiển thị ở quầy; chốt vào dòng đồ lúc phân loại
+    @Column(name = "min_quantity", nullable = false, precision = 10, scale = 2, columnDefinition = "numeric(10,2) default 0")
+    @Builder.Default
+    private BigDecimal minQuantity = BigDecimal.ZERO;
+
+    @Column(name = "whites_applicable", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean whitesApplicable = false;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
@@ -66,6 +75,15 @@ public class LaundryService extends BaseEntity {
     public void validateBusinessRules() {
         if (this.currentPrice == null || this.currentPrice.compareTo(BigDecimal.ZERO) < 0) {
             throw new BusinessException("Đơn giá không được âm");
+        }
+        if (this.minQuantity == null || this.minQuantity.signum() < 0) {
+            throw new BusinessException("Tối thiểu không được âm", "minQuantity");
+        }
+        int maxScale = this.unit == ServiceUnit.KG ? 2 : 0;
+        if (this.minQuantity.stripTrailingZeros().scale() > maxScale) {
+            throw new BusinessException(maxScale == 0
+                    ? "Tối thiểu phải là số nguyên với đơn vị này"
+                    : "Tối thiểu tối đa 2 chữ số thập phân", "minQuantity");
         }
         if (this.standardHours == null || this.standardHours <= 0) {
             throw new BusinessException("Thời gian xử lý chuẩn phải lớn hơn 0 giờ");

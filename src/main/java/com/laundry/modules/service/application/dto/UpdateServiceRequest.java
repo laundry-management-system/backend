@@ -28,6 +28,12 @@ public record UpdateServiceRequest(
         @Min(value = 1, message = "Thời gian giặt nhanh phải lớn hơn 0 giờ")
         Integer expressHours,
 
+
+        @DecimalMin(value = "0", message = "Tối thiểu không được âm")
+        BigDecimal minQuantity,
+
+        Boolean whitesApplicable,
+
         // Tùy chọn: đổi trạng thái cùng lúc với thông tin, khỏi gọi thêm PATCH /status
         ServiceStatus status
 ) {}

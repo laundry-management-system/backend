@@ -2,12 +2,19 @@ spring:
   application:
     name: laundry
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/laundry?options=-c%20TimeZone=Asia/Ho_Chi_Minh}
+    username: ${DB_USERNAME:laundry}
+    password: ${DB_PASSWORD:laundry}
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   jpa:
     hibernate:
       ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
     open-in-view: false
     defer-datasource-initialization: true
   sql:
@@ -20,6 +27,7 @@ spring:
       password: ${REDIS_PASSWORD:laundry}
 
 app:
+  upload-dir: ${UPLOAD_DIR:uploads}
   jwt:
     # Base64, >= 256 bit. Đổi qua biến môi trường JWT_SECRET khi deploy.
     secret: ${JWT_SECRET}
