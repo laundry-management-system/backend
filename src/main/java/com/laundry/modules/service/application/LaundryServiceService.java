@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Service
@@ -58,6 +59,8 @@ public class LaundryServiceService {
                 .expressSupported(request.expressSupported() != null ? request.expressSupported() : false)
                 .expressSurcharge(request.expressSurcharge())
                 .expressHours(request.expressHours())
+                .minQuantity(request.minQuantity() != null ? request.minQuantity() : BigDecimal.ZERO)
+                .whitesApplicable(Boolean.TRUE.equals(request.whitesApplicable()))
                 .status(ServiceStatus.ACTIVE)
                 .build();
 
@@ -95,6 +98,13 @@ public class LaundryServiceService {
         }
         if (request.expressHours() != null || (request.expressSupported() != null && !request.expressSupported())) {
             service.setExpressHours(request.expressHours());
+        }
+
+        if (request.minQuantity() != null) {
+            service.setMinQuantity(request.minQuantity());
+        }
+        if (request.whitesApplicable() != null) {
+            service.setWhitesApplicable(request.whitesApplicable());
         }
 
         service.validateBusinessRules();

@@ -18,6 +18,8 @@ public record ServiceResponse(
         Boolean expressSupported,
         BigDecimal expressSurcharge,
         Integer expressHours,
+        BigDecimal minQuantity,
+        Boolean whitesApplicable,
         ServiceStatus status,
         Instant createdAt,
         Instant updatedAt
@@ -34,6 +36,8 @@ public record ServiceResponse(
                 service.getExpressSupported(),
                 service.getExpressSurcharge(),
                 service.getExpressHours(),
+                service.getMinQuantity(),
+                service.getWhitesApplicable(),
                 service.getStatus(),
                 service.getCreatedAt(),
                 service.getUpdatedAt()

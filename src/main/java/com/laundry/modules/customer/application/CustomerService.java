@@ -10,6 +10,7 @@ import com.laundry.modules.customer.domain.CustomerRepository;
 import com.laundry.modules.customer.domain.CustomerStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,18 @@ import java.util.UUID;
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public Long findOrCreateForIntake(String phone, String fullName, String staffUsername) {
+        return customerRepository.findByPhone(phone.trim())
+                .map(customer -> {
+                    if (customer.getStatus() == CustomerStatus.INACTIVE) {
+                        throw new BusinessException("Hồ sơ khách đang ngừng hoạt động", "customerPhone");
+                    }
+                    return customer.getId();
+                })
+                .orElseGet(() -> createCustomer(new CreateCustomerRequest(fullName, phone, null, null), staffUsername).id());
+    }
 
     @Transactional
     public CustomerResponse createCustomer(CreateCustomerRequest request, String staffUsername) {

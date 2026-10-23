@@ -5,9 +5,16 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   jpa:
     hibernate:
       ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
     open-in-view: false
     defer-datasource-initialization: true
   sql:
@@ -17,9 +24,10 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
-      password: ${REDIS_PASSWORD:laundry}
+      password: ${REDIS_PASSWORD}
 
 app:
+  upload-dir: ${UPLOAD_DIR:uploads}
   jwt:
     # Base64, >= 256 bit. Đổi qua biến môi trường JWT_SECRET khi deploy.
     secret: ${JWT_SECRET}
@@ -31,7 +39,21 @@ app:
     max-age: ${REFRESH_COOKIE_MAX_AGE}
   cors:
     allowed-origins: ${CORS_ORIGINS}
-  front-end-setup-password-url: ${FRONT_END_SETUP_PASSWORD_URL} # TODO: Gắn link trang nhập mật khẩu vào biến
+  payment:
+    vietqr:
+      bank-id: ${VIETQR_BANK_ID}
+      account-no: ${VIETQR_ACCOUNT_NO}
+      account-name: ${VIETQR_ACCOUNT_NAME}
+      template: ${VIETQR_TEMPLATE}
+      image-base-url: ${VIETQR_IMAGE_BASE_URL}
+  public-lookup:
+    max-attempts: ${PUBLIC_LOOKUP_MAX_ATTEMPTS}
+    window-seconds: ${PUBLIC_LOOKUP_WINDOW_SECONDS}
+  orders:
+    overdue-days: ${ORDER_OVERDUE_DAYS}
+  frontend:
+    public-lookup-url: ${PUBLIC_LOOKUP_URL}
+    setup-password-url: ${SETUP_PASSWORD_URL} # TODO: Gắn link trang nhập mật khẩu vào biến
 
 springdoc:
   swagger-ui:
