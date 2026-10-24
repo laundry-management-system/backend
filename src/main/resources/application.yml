@@ -2,9 +2,13 @@ spring:
   application:
     name: laundry
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/laundry}
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/laundry?options=-c%20TimeZone=Asia/Ho_Chi_Minh}
     username: ${DB_USERNAME:laundry}
     password: ${DB_PASSWORD:laundry}
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   jpa:
     hibernate:
       ddl-auto: update
@@ -16,15 +20,26 @@ spring:
   sql:
     init:
       mode: always
-  
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD:laundry}
 
 app:
+  upload-dir: ${UPLOAD_DIR:uploads}
   jwt:
     # Base64, >= 256 bit. Đổi qua biến môi trường JWT_SECRET khi deploy.
-    secret: ${JWT_SECRET:bGF1bmRyeS1kZXYtc2VjcmV0LWtleS1jaGFuZ2UtbWUtaW4tcHJvZHVjdGlvbiE=}
-    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS}
+    refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS}
+  refresh-cookie:
+    secure: ${REFRESH_COOKIE_SECURE}
+    same-site: ${REFRESH_COOKIE_SAME_SITE}
+    max-age: ${REFRESH_COOKIE_MAX_AGE}
   cors:
-    allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
+    allowed-origins: ${CORS_ORIGINS}
+  front-end-setup-password-url: ${FRONT_END_SETUP_PASSWORD_URL} # TODO: Gắn link trang nhập mật khẩu vào biến
   payment:
     vietqr:
       bank-id: ${VIETQR_BANK_ID:}
@@ -43,3 +58,14 @@ app:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
+
+mailjet:
+  api-key: ${MAILJET_API_KEY}
+  secret-key: ${MAILJET_SECRET_KEY}
+  sender-email: ${MAILJET_SENDER_EMAIL}
+  sender-name: Laundry
+
+logging:
+  level:
+    org.springframework.web: DEBUG
+    org.springframework.web.servlet.DispatcherServlet: DEBUG
