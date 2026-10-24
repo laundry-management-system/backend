@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum OrderType {
-    NORMAL("Đơn thường"),
+    NORMAL("Tiêu chuẩn"),
     EXPRESS("Giặt nhanh");
 
     private final String description;

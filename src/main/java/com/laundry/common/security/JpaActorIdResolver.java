@@ -1,7 +1,6 @@
-package com.laundry.modules.payments.infrastructure;
+package com.laundry.common.security;
 
 import com.laundry.common.exception.NotFoundException;
-import com.laundry.common.security.ActorIdResolver;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import lombok.RequiredArgsConstructor;

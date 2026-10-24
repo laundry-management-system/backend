@@ -10,6 +10,8 @@ import com.laundry.modules.order.application.dto.CustomerTrackingResponse;
 import com.laundry.modules.order.application.dto.DeliverOrderRequest;
 import com.laundry.modules.order.application.dto.EstimateReturnTimeRequest;
 import com.laundry.modules.order.application.dto.EstimateReturnTimeResponse;
+import com.laundry.modules.order.application.dto.IntakeRequest;
+import com.laundry.modules.order.application.dto.IntakeResponse;
 import com.laundry.modules.order.application.dto.OrderDetailResponse;
 import com.laundry.modules.order.application.dto.OrderImageDto;
 import com.laundry.modules.order.application.dto.OrderReceiptResponse;
@@ -30,6 +32,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -61,6 +64,16 @@ public class OrderController {
     ) {
         String staff = getUsername(authentication);
         return orderService.quickCreate(request, staff);
+    }
+
+    @Operation(summary = "Tiếp nhận đồ v3: tạo lượt nhận 1–2 đơn (Tiêu chuẩn / Giặt nhanh), chưa có dòng đồ và giá")
+    @PostMapping("/intake")
+    public ResponseEntity<IntakeResponse> createIntake(
+            @Valid @RequestBody IntakeRequest request,
+            Authentication authentication
+    ) {
+        IntakeResponse result = orderService.createIntake(request, getUsername(authentication));
+        return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK).body(result);
     }
 
     @Operation(summary = "In phiếu nhận đồ 2 liên kèm mã QR tra cứu (BM3)")
@@ -120,9 +133,10 @@ public class OrderController {
             @RequestParam(required = false) OrderPriority priority,
             @RequestParam(required = false) String phone,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) String intakeCode,
             @PageableDefault(size = 20, sort = "dueAt", direction = Sort.Direction.ASC) Pageable pageable
     ) {
-        return orderService.getOrders(status, priority, phone, search, pageable);
+        return orderService.getOrders(status, priority, phone, search, intakeCode, pageable);
     }
 
     @Operation(summary = "Xem chi tiết đầy đủ đơn hàng (BM3, BM5)")

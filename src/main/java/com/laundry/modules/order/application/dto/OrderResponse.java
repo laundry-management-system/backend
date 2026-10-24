@@ -32,7 +32,9 @@ public record OrderResponse(
         boolean isOverdue,
         Instant receivedAt,
         Instant dueAt,
-        Instant createdAt
+        Instant createdAt,
+        String intakeCode,
+        Boolean washWhitesSeparately
 ) {
     public static OrderResponse from(Order order) {
         int itemsCount = order.getItems() != null
@@ -59,7 +61,9 @@ public record OrderResponse(
                 order.isOverdue(),
                 order.getReceivedAt(),
                 order.getDueAt(),
-                order.getCreatedAt()
+                order.getCreatedAt(),
+                order.getIntakeCode(),
+                order.getWashWhitesSeparately()
         );
     }
 }

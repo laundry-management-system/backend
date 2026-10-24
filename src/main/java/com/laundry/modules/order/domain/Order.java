@@ -11,6 +11,9 @@ import jakarta.persistence.Index;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(
@@ -30,8 +34,11 @@ import java.util.List;
                 @Index(name = "idx_orders_customer_phone", columnList = "customerPhone"),
                 @Index(name = "idx_orders_order_code", columnList = "orderCode"),
                 @Index(name = "idx_orders_status", columnList = "status"),
-                @Index(name = "idx_orders_due_at", columnList = "dueAt")
-        }
+                @Index(name = "idx_orders_due_at", columnList = "dueAt"),
+                @Index(name = "idx_orders_intake_code", columnList = "intake_code")
+        },
+        uniqueConstraints = @UniqueConstraint(name = "uk_orders_intake_request_type",
+                columnNames = {"intake_request_id", "order_type"})
 )
 @Getter
 @Setter
@@ -57,6 +64,27 @@ public class Order extends BaseEntity {
 
     @Column(name = "voucher_id")
     private Long voucherId;
+
+    // Lượt nhận v3: null = đơn tạo trước tiếp nhận v3
+    @Column(name = "intake_code", length = 20)
+    private String intakeCode;
+
+    @Column(name = "intake_request_id")
+    private UUID intakeRequestId;
+
+    // Dịch vụ chọn ở quầy: chỉ để tham khảo/gợi ý, không có giá
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "requested_service_ids", columnDefinition = "jsonb")
+    private List<Long> requestedServiceIds;
+
+    @Column(name = "wash_whites_separately", nullable = false, columnDefinition = "boolean default false")
+    @Builder.Default
+    private Boolean washWhitesSeparately = false;
+
+    // Chốt lúc phân loại
+    @Column(name = "whites_fee", nullable = false, precision = 12, scale = 0, columnDefinition = "numeric(12,0) default 0")
+    @Builder.Default
+    private BigDecimal whitesFee = BigDecimal.ZERO;
 
     @Column(name = "received_at", nullable = false)
     private Instant receivedAt;
@@ -168,6 +196,29 @@ public class Order extends BaseEntity {
                 .performedBy(performedBy != null ? performedBy : "SYSTEM")
                 .build();
         this.historyList.add(history);
+    }
+
+    public boolean isIntakeV3() {
+        return this.intakeCode != null;
+    }
+
+    /** Tổng theo QĐ5: Σ thành tiền + phụ phí nhanh + phụ phí đồ trắng − giảm giá (giảm ≤ tiền hàng). */
+    public void recalcTotals(BigDecimal requestedDiscount) {
+        BigDecimal sub = BigDecimal.ZERO;
+        BigDecimal express = BigDecimal.ZERO;
+        for (OrderItem item : this.items) {
+            sub = sub.add(item.getLineTotal());
+            if (this.orderType == OrderType.EXPRESS) {
+                express = express.add(item.getExpressSurcharge()
+                        .multiply(item.getBillableQuantity())
+                        .setScale(0, java.math.RoundingMode.HALF_UP));
+            }
+        }
+        BigDecimal discount = requestedDiscount == null ? BigDecimal.ZERO : requestedDiscount.min(sub);
+        this.subtotal = sub;
+        this.expressFee = express;
+        this.discountAmount = discount;
+        this.totalAmount = sub.add(express).add(this.whitesFee).subtract(discount);
     }
 
     public void updateItems(List<OrderItem> newItems, String performedBy) {
