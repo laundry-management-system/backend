@@ -6,5 +6,6 @@ public enum EntityType {
     CUSTOMER,
     ORDER,
     PAYMENT,
-    SERVICE
+    SERVICE,
+    SETTING
 }
