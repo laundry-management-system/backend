@@ -6,8 +6,8 @@ SELECT 1;
 
 CREATE SEQUENCE IF NOT EXISTS employee_code_seq START WITH 2;
 
-INSERT INTO users (id, employee_code, full_name, phone, email, username, password_hash, role, status, hired_date, created_at, updated_at)
-VALUES (1, 'NV01', 'Admin', '0900000000', 'tunhcaibe10@gmail.com', 'admin',
+INSERT INTO users (employee_code, full_name, phone, email, username, password_hash, role, status, hired_date, created_at, updated_at)
+VALUES ('NV01', 'Admin', '0900000000', 'tunhcaibe10@gmail.com', 'admin',
         '$2a$10$khyNcyj/YzTH/aSq7TC3w..90d3JmpNfjuCSfvbSiSqV8zqPjW8A6',
         'ADMIN', 'ACTIVE', CURRENT_DATE, NOW(), NOW())
     ON CONFLICT (username) DO NOTHING;
@@ -33,8 +33,6 @@ SELECT v.* FROM (VALUES
 ) AS v
 WHERE NOT EXISTS (SELECT 1 FROM services);
 
-INSERT INTO settings (setting_key, setting_value) VALUES ('WHITES_FEE', '80000') ON CONFLICT DO NOTHING;
-
 INSERT INTO users (id, employee_code, full_name, phone, email, username, password_hash, role, status, hired_date, created_at, updated_at)
 VALUES (0, 'NV00', 'system', '0000000000', 'system@gmail.com', 'system',
         '$2a$10$khyNcyj/YzTH/aSq7TC3w..90d3JmpNfjuCSfvbSiSqV8zqPjW8A6',
@@ -58,5 +56,7 @@ VALUES
     ('STORAGE_DAYS', '30', 'Số ngày lưu trữ đồ sau khi hoàn thành đơn hàng', NULL, NOW()),
 
     ('STORE_NAME', 'Laundry Shop', 'Tên cửa hàng giặt ủi', NULL, NOW()),
-    ('STORE_ADDRESS', 'Chưa cập nhật', 'Địa chỉ cửa hàng giặt ủi', NULL, NOW())
+    ('STORE_ADDRESS', 'Chưa cập nhật', 'Địa chỉ cửa hàng giặt ủi', NULL, NOW()),
+
+    ('WHITES_FEE', '80000', 'Phụ phí giặt riêng đồ trắng (đ/đơn)', NULL, NOW())
 ON CONFLICT (setting_key) DO NOTHING;

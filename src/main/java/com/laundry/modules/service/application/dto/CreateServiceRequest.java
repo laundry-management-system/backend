@@ -33,6 +33,7 @@ public record CreateServiceRequest(
         @Min(value = 1, message = "Thời gian giặt nhanh phải lớn hơn 0 giờ")
         Integer expressHours,
 
+
         @DecimalMin(value = "0", message = "Tối thiểu không được âm")
         BigDecimal minQuantity,
 

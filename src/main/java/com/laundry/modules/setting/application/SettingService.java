@@ -17,6 +17,7 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,6 +87,11 @@ public class SettingService {
                             + clazz.getSimpleName());
         }
         return clazz.cast(parsed);
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal getWhitesFee() {
+        return BigDecimal.valueOf(getValue(SettingKey.WHITES_FEE, Integer.class));
     }
 
     @Transactional(readOnly = true)

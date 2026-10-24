@@ -33,7 +33,8 @@ public class Setting {
     Long updatedBy;
 
     @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
+    // DEFAULT now(): ddl-auto mới thêm được cột NOT NULL vào bảng settings cũ đã có dữ liệu
+    @Column(name = "updated_at", nullable = false, columnDefinition = "timestamp(6) with time zone default now()")
     Instant updatedAt;
 
     public Setting update(String value, Long updatedBy) {

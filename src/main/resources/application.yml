@@ -2,9 +2,9 @@ spring:
   application:
     name: laundry
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/laundry?options=-c%20TimeZone=Asia/Ho_Chi_Minh}
+    username: ${DB_USERNAME:laundry}
+    password: ${DB_PASSWORD:laundry}
   servlet:
     multipart:
       max-file-size: 5MB
@@ -24,7 +24,7 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
-      password: ${REDIS_PASSWORD}
+      password: ${REDIS_PASSWORD:laundry}
 
 app:
   upload-dir: ${UPLOAD_DIR:uploads}
@@ -52,7 +52,6 @@ app:
   orders:
     overdue-days: ${ORDER_OVERDUE_DAYS}
   frontend:
-    public-lookup-url: ${PUBLIC_LOOKUP_URL}
     setup-password-url: ${SETUP_PASSWORD_URL} # TODO: Gắn link trang nhập mật khẩu vào biến
 
 springdoc:

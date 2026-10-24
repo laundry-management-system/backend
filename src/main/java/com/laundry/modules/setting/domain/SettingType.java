@@ -24,6 +24,17 @@ public enum SettingType {
         }
     },
 
+    NON_NEGATIVE_INT("số nguyên không âm, ví dụ 80000") {
+        @Override
+        public Object parse(String raw) {
+            int value = Integer.parseInt(raw.trim());
+            if (value < 0) {
+                throw new IllegalArgumentException("Không được âm");
+            }
+            return value;
+        }
+    },
+
     /** Đúng dạng HH:mm hai chữ số: "08:00" hợp lệ, "8:00" không hợp lệ. */
     TIME("giờ dạng HH:mm, ví dụ 08:00") {
         @Override

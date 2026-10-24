@@ -16,7 +16,8 @@ public enum SettingKey {
     COMPENSATION_TERMS(SettingType.STRING),
     STORAGE_DAYS(SettingType.POSITIVE_INT),
     STORE_NAME(SettingType.STRING),
-    STORE_ADDRESS(SettingType.STRING),;
+    STORE_ADDRESS(SettingType.STRING),
+    WHITES_FEE(SettingType.NON_NEGATIVE_INT);
 
     private final SettingType type;
 
