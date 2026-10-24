@@ -5,6 +5,10 @@ spring:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   jpa:
     hibernate:
       ddl-auto: update
@@ -23,6 +27,7 @@ spring:
       password: ${REDIS_PASSWORD}
 
 app:
+  upload-dir: ${UPLOAD_DIR:uploads}
   jwt:
     # Base64, >= 256 bit. Đổi qua biến môi trường JWT_SECRET khi deploy.
     secret: ${JWT_SECRET}

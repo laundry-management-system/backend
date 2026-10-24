@@ -10,6 +10,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /** Mọi lỗi trả về cùng định dạng ProblemDetail (RFC 9457) cho FE. */
@@ -24,7 +25,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BusinessException.class)
     public ProblemDetail handleBusiness(BusinessException ex) {
-        return problem(HttpStatus.BAD_REQUEST, ex.getMessage());
+        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, ex.getMessage());
+        if (ex.getField() != null) pd.setProperty("errors", Map.of(ex.getField(), ex.getMessage()));
+        return pd;
     }
 
     @ExceptionHandler(ResourceConflictException.class)
@@ -45,6 +48,13 @@ public class GlobalExceptionHandler {
         }
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, "Dữ liệu không hợp lệ");
         pd.setProperty("errors", errors);
+        return pd;
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ProblemDetail handleUploadTooLarge(MaxUploadSizeExceededException ex) {
+        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, "File tối đa 5MB");
+        pd.setProperty("errors", Map.of("file", "File tối đa 5MB"));
         return pd;
     }
 

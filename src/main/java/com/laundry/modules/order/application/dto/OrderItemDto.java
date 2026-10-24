@@ -43,7 +43,16 @@ public record OrderItemDto(
         String conditionNote,
 
         @Schema(description = "Danh sách ảnh tình trạng món đồ")
-        List<OrderImageDto> images
+        List<OrderImageDto> images,
+
+        @Schema(description = "KL/SL tối thiểu đã chốt lúc phân loại (chỉ đọc)")
+        BigDecimal minQuantity,
+
+        @Schema(description = "KL/SL thực tế (chỉ đọc; request dùng quantity)")
+        BigDecimal actualQuantity,
+
+        @Schema(description = "KL/SL tính tiền = max(thực tế, tối thiểu) (chỉ đọc)")
+        BigDecimal billableQuantity
 ) {
     public static OrderItemDto from(OrderItem item) {
         List<OrderImageDto> imageDtos = item.getImages() != null
@@ -60,7 +69,10 @@ public record OrderItemDto(
                 item.getExpressSurcharge(),
                 item.getLineTotal(),
                 item.getConditionNote(),
-                imageDtos
+                imageDtos,
+                item.getMinQuantity(),
+                item.getActualQuantity(),
+                item.getBillableQuantity()
         );
     }
 }
