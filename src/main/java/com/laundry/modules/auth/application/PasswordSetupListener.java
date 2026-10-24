@@ -106,6 +106,6 @@ public class PasswordSetupListener {
             </html>
             """.formatted(e.username(), e.link(), e.link(), e.link());
 
-        mailjetMailService.sendTemplate(e.email(), "Thiết lập mật khẩu tài khoản", html);
+        mailjetMailService.sendHtml(e.email(), "Thiết lập mật khẩu tài khoản", html);
     }
 }

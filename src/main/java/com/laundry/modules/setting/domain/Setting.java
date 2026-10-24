@@ -1,30 +1,45 @@
 package com.laundry.modules.setting.domain;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.UpdateTimestamp;
 
-/** Cấu hình tiệm dạng key-value; cùng schema bảng `settings` của nhánh release/qc. */
+import java.time.Instant;
+
 @Entity
-@Table(name = "settings")
 @Getter
-@Setter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor
 @AllArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
+@Table(name = "settings")
 public class Setting {
 
-    public static final String WHITES_FEE = "WHITES_FEE";
-
+    @Enumerated(value = EnumType.STRING)
     @Id
     @Column(name = "setting_key", length = 50)
-    private String settingKey;
+    SettingKey settingKey;
 
-    @Column(name = "setting_value", nullable = false)
-    private String settingValue;
+    @Column(name = "setting_value", nullable = false, columnDefinition = "TEXT")
+    String settingValue;
+
+    @Column(name = "description")
+    String description;
+
+    @Column(name = "updated_by")
+    Long updatedBy;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    Instant updatedAt;
+
+    public Setting update(String value, Long updatedBy) {
+        this.settingValue = value;
+        this.updatedBy = updatedBy;
+
+        return this;
+    }
 }

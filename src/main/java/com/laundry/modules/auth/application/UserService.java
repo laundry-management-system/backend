@@ -2,14 +2,18 @@ package com.laundry.modules.auth.application;
 
 import com.laundry.common.exception.BusinessException;
 import com.laundry.common.exception.NotFoundException;
-import com.laundry.modules.auth.application.dto.CreateUserRequest;
-import com.laundry.modules.auth.application.dto.SetupPasswordRequest;
-import com.laundry.modules.auth.application.dto.UpdateUserRequest;
-import com.laundry.modules.auth.application.dto.UserResponse;
+import com.laundry.modules.auth.application.dto.*;
 import com.laundry.modules.auth.domain.Role;
 import com.laundry.modules.auth.domain.Status;
 import com.laundry.modules.auth.domain.User;
 import com.laundry.modules.auth.domain.UserRepository;
+import com.laundry.modules.log.application.AuditLogService;
+import com.laundry.modules.log.application.dto.AuditEntry;
+import com.laundry.modules.log.domain.AuditAction;
+import com.laundry.modules.log.domain.EntityType;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -31,9 +35,11 @@ public class UserService {
     EmployeeCodeGenerator employeeCodeGenerator;
     UsernameGenerator usernameGenerator;
     PasswordSetupService passwordSetupService;
+    AuditLogService auditLogService;
 
     @Transactional
     public UserResponse createUser(CreateUserRequest createUserRequest){
+        String email = createUserRequest.email().trim().toLowerCase(Locale.ROOT);
         if(userRepository.existsByPhone(createUserRequest.phone())){
             throw new BusinessException("Số điện thoại đã được đăng ký");
         }
@@ -42,6 +48,7 @@ public class UserService {
             throw new BusinessException("Email đã được đăng ký");
         }
 
+        User saved;
         try{
             String passwordHash = passwordEncoder.encode(UUID.randomUUID().toString());
             String username = usernameGenerator.generate(createUserRequest.fullName());
@@ -50,107 +57,138 @@ public class UserService {
                   .employeeCode(employeeCodeGenerator.next())
                   .fullName(createUserRequest.fullName())
                   .phone(createUserRequest.phone())
-                  .email(createUserRequest.email())
+                  .email(email)
                   .username(username)
                   .passwordHash(passwordHash)
                   .role(createUserRequest.role())
-                  .status(Status.INACTIVE)
+                  .status(Status.PENDING)
                   .hiredDate(createUserRequest.hiredDate())
                   .build();
 
-            userRepository.save(user);
-
-            passwordSetupService.sendSetupMail(user);
-
-            return UserResponse.from(user);
+            saved = userRepository.saveAndFlush(user);
         }catch(DataIntegrityViolationException e){
             throw new BusinessException("Email hoặc số điện thoại đã tồn tại");
         }
 
-        // TODO(audit): ghi AuditLog ACCOUNT_MANAGE (BR-J01) - người thực hiện = Admin hiện tại, entity = user/{id}, old/new = status
+        passwordSetupService.sendSetupMail(saved);
+
+        Map<String, Object> newData = userToJson(saved);
+        audit(AuditAction.ACCOUNT_MANAGE, saved.getId(), null, newData);
+
+        return UserResponse.from(saved);
+    }
+
+    private Map<String, Object> userToJson(User user){
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", user.getId());
+        map.put("fullName", user.getFullName());
+        map.put("email", user.getEmail());
+        map.put("phone", user.getPhone());
+        map.put("username", user.getUsername());
+        map.put("role", user.getRole());
+        map.put("status", user.getStatus());
+        map.put("hiredDate", user.getHiredDate());
+
+        return map;
+    }
+
+    private void audit(
+            AuditAction auditAction,
+            Long id,
+            Map<String, Object> oldData,
+            Map<String, Object> newData){
+        auditLogService.log(new AuditEntry(
+                auditAction,
+                EntityType.USER,
+                id,
+                oldData,
+                newData,
+                null
+        ));
     }
 
     @Transactional
     public UserResponse updateUser(Long userId, UpdateUserRequest updateUserRequest){
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> NotFoundException.of("Người dùng", userId));
-
-        if(!user.isActive()) throw new BusinessException("Người dùng đã bị vô hiệu hóa");
+        User user = getUserOrThrow(userId);
+        Map<String, Object> oldData = userToJson(user);
 
         if(!updateUserRequest.phone().equals(user.getPhone()) &&
                 userRepository.existsByPhone(updateUserRequest.phone())) {
             throw new BusinessException("Số điện thoại đã tồn tại");
         }
 
-        try{
-            user.updateProfile(
-                    updateUserRequest.fullName(),
-                    updateUserRequest.phone(),
-                    updateUserRequest.hiredDate()
-            );
+        user.updateProfile(
+                updateUserRequest.fullName(),
+                updateUserRequest.phone(),
+                updateUserRequest.hiredDate()
+        );
 
-            userRepository.save(user);
-            return UserResponse.from(user);
+        try{
+            userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException e) {
           throw new BusinessException("Số điện thoại đã tồn tại");
         }
 
-        // TODO(audit): ghi AuditLog ACCOUNT_MANAGE (BR-J01) - người thực hiện = Admin hiện tại, entity = user/{id}, old/new = status
+        Map<String, Object> newData = userToJson(user);
+
+        audit(AuditAction.ACCOUNT_MANAGE, user.getId(), oldData, newData);
+
+        return UserResponse.from(user);
     }
 
     @Transactional
-    public UserResponse updateMyProfile(String username, UpdateUserRequest updateUserRequest){
-    User user = userRepository.findByUsername(username).orElseThrow(() -> new NotFoundException("Người dùng không tồn tại"));
+    public UserResponse updateMyProfile(String username, UpdateMyProfileRequest request){
+        User user = userRepository.findByUsername(username).orElseThrow(() -> new NotFoundException("Người dùng không tồn tại"));
+        Map<String, Object> oldData = userToJson(user);
 
-        if(!user.isActive()) throw new BusinessException("Người dùng đã bị vô hiệu hóa");
-
-        if(!updateUserRequest.phone().equals(user.getPhone()) &&
-                userRepository.existsByPhone(updateUserRequest.phone())) {
+        if(!request.phone().equals(user.getPhone()) &&
+                userRepository.existsByPhone(request.phone())) {
             throw new BusinessException("Số điện thoại đã tồn tại");
         }
 
-        try{
-            user.updateProfile(
-                    updateUserRequest.fullName(),
-                    updateUserRequest.phone(),
-                    updateUserRequest.hiredDate()
-            );
+        user.updateProfile(
+                request.fullName(),
+                request.phone()
+        );
 
-            userRepository.save(user);
-            return UserResponse.from(user);
+        try{
+            userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException e) {
             throw new BusinessException("Số điện thoại đã tồn tại");
         }
 
-        // TODO(audit): ghi AuditLog ACCOUNT_MANAGE (BR-J01) - người thực hiện = Admin hiện tại, entity = user/{id}, old/new = status
+        Map<String, Object> newData = userToJson(user);
+        audit(AuditAction.ACCOUNT_MANAGE, user.getId(), oldData, newData);
+
+        return UserResponse.from(user);
     }
 
     @Transactional
     public void deleteUser(Long userId){
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> NotFoundException.of("Người dùng", userId));
+        User user = getUserOrThrow(userId);
+        Map<String, Object> oldData = userToJson(user);
+
         if(user.getRole() == Role.ADMIN){
                 throw new BusinessException("Tài khoản ADMIN không thể vô hiệu hóa");
         }
 
-        if(!user.isActive()){
-            throw new BusinessException("Người dùng đã bị vô hiệu hóa");
-        }
         user.disable();
-
-        // TODO(audit): ghi AuditLog ACCOUNT_MANAGE (BR-J01) - người thực hiện = Admin hiện tại, entity = user/{id}, old/new = status
         userRepository.save(user);
+
+        Map<String, Object> newData = userToJson(user);
+        audit(AuditAction.ACCOUNT_MANAGE, user.getId(), oldData, newData);
     }
 
     @Transactional
     public void enableUser(Long userId){
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> NotFoundException.of("Người dùng", userId));
-        if(!user.isActive()){
-            user.enable();
-            // TODO(audit): ghi AuditLog ACCOUNT_MANAGE (BR-J01) - người thực hiện = Admin hiện tại, entity = user/{id}, old/new = status
-            userRepository.save(user);
-        }
+        User user = getUserOrThrow(userId);
+        Map<String, Object> oldData = userToJson(user);
+
+        user.enable();
+        userRepository.save(user);
+
+        Map<String, Object> newData = userToJson(user);
+        audit(AuditAction.ACCOUNT_MANAGE, user.getId(), oldData, newData);
     }
 
     @Transactional(readOnly = true)
@@ -168,30 +206,44 @@ public class UserService {
 
     @Transactional(readOnly = true)
     public Page<UserResponse> getAllUsers(Status status, String keyword, Pageable pageable){
-        String normalizedKeyword = keyword == null ? null: keyword.trim();
-        return userRepository.findAllByParam(status, normalizedKeyword, pageable)
+        return userRepository.findAllByParam(status, toLikePattern(keyword), pageable)
                 .map(UserResponse::from);
+    }
+
+    private static String toLikePattern(String keyword){
+        if(keyword == null || keyword.isBlank()) return null;
+
+        String escaped = keyword.trim()
+                .toLowerCase(Locale.ROOT)
+                .replace("\\", "\\\\")   // escape trước, để không escape lại các ký tự bên dưới
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+
+        return "%" + escaped + "%";
     }
 
     @Transactional
     public void resend(Long userId){
-        User user = userRepository.findById(userId).orElseThrow(() -> NotFoundException.of("Người dùng", userId));
+        User user = getUserOrThrow(userId);
+
+        user.requirePending();
+
         passwordSetupService.sendSetupMail(user);
     }
 
     @Transactional
     public void setupPassword(String token, SetupPasswordRequest request){
-        String passwordHash = passwordEncoder.encode(request.password());
         Long userId = passwordSetupService.consumeToken(token);
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> NotFoundException.of("Người dùng", userId));
+        User user = getUserOrThrow(userId);
 
-        if(user.isActive()){
-            throw new BusinessException("Tài khoản đã được kích hoạt");
-        }
-
-        user.setupPassword(passwordHash);
-        user.enable();
+        user.setupPassword(passwordEncoder.encode(request.password()));
         userRepository.save(user);
+
+        audit(AuditAction.SET_UP_PASSWORD, user.getId(), null, null);
+    }
+
+    User getUserOrThrow(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> NotFoundException.of("Người dùng", userId));
     }
 }

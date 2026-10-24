@@ -18,7 +18,6 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Service
-@Async
 @Slf4j
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
@@ -26,6 +25,8 @@ public class MailjetMailService{
 
     MailjetClient client;
     MailjetProperties props;
+
+    static final int MAX_ATTEMPTS = 3;
 
     public void send(MailMessage message) {
         try {
@@ -57,9 +58,7 @@ public class MailjetMailService{
             if (response.getStatus() == 200) {
                 String messageId = extractMessageId(response);
                 log.info("Mailjet sent OK to={} messageId={}", message.to(), messageId);
-            }
-
-            log.error("Mailjet failed status={} body={}", response.getStatus(), response.getData());
+            }else log.error("Mailjet failed status={} body={}", response.getStatus(), response.getData());
 
         } catch (Exception e) {
             log.error("Mailjet exception to={}", message.to(), e);
@@ -69,11 +68,29 @@ public class MailjetMailService{
 
 
     @Async("mailExecutor")
-    public void sendTemplate(String to, String subject, String html) {
-        try {
-      send(MailMessage.builder().to(List.of(to)).subject(subject).htmlContent(html).build());
-        } catch (Exception e) {
-            log.error("Async mail failed", e);
+    public void sendHtml(String to, String subject, String html) {
+        MailMessage message = MailMessage.builder()
+                .to(List.of(to)).subject(subject).htmlContent(html).build();
+
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                send(message);
+                return;
+            } catch (MailjetSendException e) {
+                boolean last = attempt == MAX_ATTEMPTS;
+                if (!e.isRetryable() || last) {
+                    log.error("Gửi mail thất bại (lần {}/{}, status={})",
+                            attempt, MAX_ATTEMPTS, e.getStatus(), e);
+                    return;
+                }
+                log.warn("Gửi mail lần {} thất bại (status={}), thử lại", attempt, e.getStatus());
+                try {
+                    Thread.sleep(2000L * attempt);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
         }
     }
 
@@ -90,5 +107,18 @@ public class MailjetMailService{
         } catch (Exception e) {
             return null;
         }
+    }
+
+    static class MailjetSendException extends MailSendException {
+        private final int status;
+
+        MailjetSendException(String msg, int status, Throwable cause) {
+            super(msg, cause);
+            this.status = status;
+        }
+        int getStatus() { return status; }
+
+        // 4xx (sai key, sai dữ liệu) thử lại cũng vô ích, trừ 429 (rate limit)
+        boolean isRetryable() { return status == -1 || status == 429 || status >= 500; }
     }
 }

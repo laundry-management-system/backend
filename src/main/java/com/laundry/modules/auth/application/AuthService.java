@@ -2,11 +2,18 @@ package com.laundry.modules.auth.application;
 
 import com.laundry.common.exception.BusinessException;
 import com.laundry.common.exception.NotFoundException;
+import com.laundry.common.security.ActorIdResolver;
 import com.laundry.common.security.JwtUtil;
 import com.laundry.modules.auth.application.dto.AuthDTO;
 import com.laundry.modules.auth.application.dto.LoginRequest;
 import com.laundry.modules.auth.domain.User;
 import com.laundry.modules.auth.domain.UserRepository;
+import com.laundry.modules.log.application.AuditLogService;
+import com.laundry.modules.log.application.dto.AuditEntry;
+import com.laundry.modules.log.domain.AuditAction;
+import com.laundry.modules.log.domain.EntityType;
+import com.laundry.modules.setting.application.SettingService;
+import com.laundry.modules.setting.domain.SettingKey;
 import io.jsonwebtoken.Claims;
 import java.time.Duration;
 import java.time.Instant;
@@ -31,6 +38,9 @@ public class AuthService {
     JwtUtil jwtUtil;
     StringRedisTemplate stringRedisTemplate;
     UserRepository userRepository;
+    AuditLogService auditLogService;
+    SettingService settingService;
+    ActorIdResolver resolver;
 
     String loginAttemptKeyPrefix = "laundry:auth:login:attempt:";
     String lockKeyPrefix = "laundry:auth:isLocked:";
@@ -38,7 +48,8 @@ public class AuthService {
 
     public AuthDTO login(LoginRequest loginRequest) {
         if(isLocked(loginRequest.username())){
-            throw new BusinessException("Tài khoản đã bị khóa do đăng nhập thất bại quá nhiều lần. Vui lòng thử lại sau 15 phút.");
+            int lockMinutes = settingService.getValue(SettingKey.LOCK_MINUTES, Integer.class);
+            throw new BusinessException("Tài khoản đã bị khóa do đăng nhập thất bại quá nhiều lần. Vui lòng thử lại sau " + lockMinutes + " phút.");
         }
 
         try{
@@ -98,13 +109,23 @@ public class AuthService {
     }
 
     private void recordFailedAttempt(String username){
-        int maxAttempts = 5;
+        int maxAttempts = settingService.getValue(SettingKey.MAX_LOGIN_FAIL, Integer.class);
+        int lockMinutes = settingService.getValue(SettingKey.LOCK_MINUTES, Integer.class);
         int attempts = stringRedisTemplate.opsForValue().increment(loginAttemptKeyPrefix + username).intValue();
         stringRedisTemplate.expire(loginAttemptKeyPrefix + username, Duration.ofMinutes(5));
 
         if(attempts >= maxAttempts){
-            stringRedisTemplate.opsForValue().set(lockKeyPrefix + username, "true", Duration.ofMinutes(15));
+            stringRedisTemplate.opsForValue().set(lockKeyPrefix + username, "true", Duration.ofMinutes(lockMinutes));
             stringRedisTemplate.delete(loginAttemptKeyPrefix + username);
+
+            auditLogService.log(new AuditEntry(
+                    AuditAction.ACCOUNT_LOCKED,
+                    EntityType.AUTH,
+                    resolver.resolveId(username),
+                    null,
+                    null,
+                    "Đăng nhập sai quá số lần quy định"
+            ));
         }
     }
 

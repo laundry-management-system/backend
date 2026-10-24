@@ -14,8 +14,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-@Service
+    @Service
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class PasswordSetupService {
@@ -48,12 +50,29 @@ public class PasswordSetupService {
     }
 
     public Long consumeToken(String token) {
-        String userId = redis.opsForValue().getAndDelete(TOKEN_KEY + token); // dùng 1 lần
+        String userId = redis.opsForValue().getAndDelete(TOKEN_KEY + token);
         if (userId == null) {
             throw new BusinessException("Link không hợp lệ hoặc đã hết hạn");
         }
         redis.delete(USER_KEY + userId);
+        restoreOnRollback(token, userId);
         return Long.valueOf(userId);
+    }
+
+    private void restoreOnRollback(String token, String userId) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) return;
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_ROLLED_BACK) return;
+                // Chỉ khôi phục nếu admin chưa gửi lại link mới trong lúc đó
+                Boolean restored = redis.opsForValue().setIfAbsent(USER_KEY + userId, token, TTL);
+                if (Boolean.TRUE.equals(restored)) {
+                    redis.opsForValue().set(TOKEN_KEY + token, userId, TTL);
+                }
+            }
+        });
     }
 
 }
