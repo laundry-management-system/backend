@@ -1,5 +1,6 @@
 package com.laundry.modules.log.application;
 
+import com.laundry.common.exception.BusinessException;
 import com.laundry.common.exception.NotFoundException;
 import com.laundry.common.security.ClientInfo;
 import com.laundry.modules.auth.domain.User;
@@ -60,17 +61,18 @@ public class AuditLogService {
     }
 
     private void validate(AuditEntry entry) {
-        if (entry == null) {
-            throw new IllegalArgumentException("AuditEntry không được null");
+        if (entry == null) throw new IllegalArgumentException("AuditEntry không được null");
+        if (entry.action() == null) throw new IllegalArgumentException("Thiếu hành động (action) của nhật ký");
+        if (entry.entityType() == null) throw new IllegalArgumentException("Thiếu kiểu dữ liệu của đối tượng (entityType)");
+        if (entry.entityId() == null) throw new IllegalArgumentException("Thiếu id của đối tượng (entityId)");
+
+        // Lý do đến từ người dùng nên dùng BusinessException (400) thay vì IAE (500)
+        String reason = entry.reason();
+        if (entry.action().isReasonRequired() && (reason == null || reason.isBlank())) {
+            throw new BusinessException("Hành động này bắt buộc phải nhập lý do");
         }
-        if (entry.action() == null) {
-            throw new IllegalArgumentException("Thiếu hành động (action) của nhật ký");
-        }
-        if (entry.entityType() == null) {
-            throw new IllegalArgumentException("Thiếu kiểu dữ liệu của đối tượng (entityType)");
-        }
-        if (entry.entityId() == null) {
-            throw new IllegalArgumentException("Thiếu id của đối tượng (entityId)");
+        if (reason != null && reason.length() > 500) {
+            throw new BusinessException("Lý do không được vượt quá 500 ký tự");
         }
     }
 

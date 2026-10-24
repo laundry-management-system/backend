@@ -17,10 +17,10 @@ import org.hibernate.type.SqlTypes;
 @Table(
         name = "audit_logs",
         indexes = {
-                @Index(name = "idx_audit_logs_entity_type", columnList = "entityType"),
-                @Index(name = "idx_audit_logs_entity_id", columnList = "entityId"),
-                @Index(name = "idx_audit_logs_action", columnList = "action"),
-                @Index(name = "idx_audit_logs_created_at", columnList = "createdAt")
+                @Index(name = "idx_audit_logs_entity",     columnList = "entity_type, entity_id"),
+                @Index(name = "idx_audit_logs_action",     columnList = "action"),
+                @Index(name = "idx_audit_logs_user_id",    columnList = "user_id"),
+                @Index(name = "idx_audit_logs_created_at", columnList = "created_at")
         }
 )
 public class AuditLog extends BaseEntity {

@@ -1,10 +1,7 @@
 package com.laundry.modules.auth.presentation;
 
 import com.laundry.modules.auth.application.UserService;
-import com.laundry.modules.auth.application.dto.CreateUserRequest;
-import com.laundry.modules.auth.application.dto.SetupPasswordRequest;
-import com.laundry.modules.auth.application.dto.UpdateUserRequest;
-import com.laundry.modules.auth.application.dto.UserResponse;
+import com.laundry.modules.auth.application.dto.*;
 import com.laundry.modules.auth.domain.Status;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -75,9 +72,9 @@ public class UserController {
     @Operation(summary = "Cập nhật thông tin của bản thân", description = "API cập nhật thông tin của bản thân")
     @PatchMapping("/me")
     @ResponseStatus(HttpStatus.OK)
-    public UserResponse updateMyInfo(@RequestBody @Valid UpdateUserRequest updateUserRequest,
+    public UserResponse updateMyInfo(@RequestBody @Valid UpdateMyProfileRequest request,
                                      Authentication authentication) {
-    return userService.updateMyProfile(authentication.getName(), updateUserRequest);
+    return userService.updateMyProfile(authentication.getName(), request);
     }
 
     @Operation(summary = "Xóa nhân viên", description = "API xóa nhân viên theo ID")

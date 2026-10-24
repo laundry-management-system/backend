@@ -23,5 +23,6 @@ public record UpdateUserRequest(
         String phone,
 
         @Schema(description = "Ngày vào làm của nhân viên", example = "2026-10-20")
+        @NotBlank
         LocalDate hiredDate
 ) {}

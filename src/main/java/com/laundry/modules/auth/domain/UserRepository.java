@@ -16,18 +16,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("Select u.id from User u where u.username = :username")
     Optional<Long> findIdByUsername(String username);
 
-    @Query(
-        """
-        select u from User u
-            where (:status is null or u.status = :status) and
-                (   :keyword is null or
-                    u.employeeCode like concat('%', :keyword, '%') or
-                    u.fullName like concat('%', :keyword, '%') or
-                    u.phone like concat('%', :keyword, '%') or
-                    u.email like concat('%', :keyword, '%')
-                )
-        """
-      )
+    @Query("""
+    SELECT u FROM User u
+    WHERE (:status IS NULL OR u.status = :status)
+      AND (:keyword IS NULL
+           OR LOWER(u.employeeCode) LIKE CAST(:keyword AS string) ESCAPE '\\'
+           OR LOWER(u.fullName)     LIKE CAST(:keyword AS string) ESCAPE '\\'
+           OR LOWER(u.phone)        LIKE CAST(:keyword AS string) ESCAPE '\\'
+           OR LOWER(u.email)        LIKE CAST(:keyword AS string) ESCAPE '\\')
+    """)
     Page<User> findAllByParam(@Param("status") Status status,
                               @Param("keyword") String keyword,
                               Pageable pageable);
