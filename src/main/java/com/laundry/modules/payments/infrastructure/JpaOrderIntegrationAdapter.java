@@ -25,13 +25,12 @@ import java.util.Optional;
 public class JpaOrderIntegrationAdapter implements OrderIntegration {
 
     private static final String ORDER_SELECT = """
-            SELECT o.id, o.order_code, o.customer_id, c.full_name, BTRIM(c.phone),
+            SELECT o.id, o.order_code, o.customer_id, o.customer_name, BTRIM(o.customer_phone),
                    o.received_at, o.due_at, o.total_amount, o.status, o.payment_status,
                    o.completed_at, o.shelf_location, o.delivered_at, o.delivered_by,
                    o.receiver_name, o.receiver_relation, o.last_notified_at,
                    o.notify_count, o.note
               FROM orders o
-              JOIN customers c ON c.id = o.customer_id
             """;
 
     private final EntityManager entityManager;
@@ -75,7 +74,7 @@ public class JpaOrderIntegrationAdapter implements OrderIntegration {
 
     @Override
     @Transactional
-    public void deliver(long orderId, Instant deliveredAt, long deliveredBy, String receiverName,
+    public void deliver(long orderId, Instant deliveredAt, String deliveredBy, String receiverName,
                         String receiverRelation) {
         int updated = entityManager.createNativeQuery("""
                         UPDATE orders
@@ -151,7 +150,7 @@ public class JpaOrderIntegrationAdapter implements OrderIntegration {
         return new OrderSnapshot(
                 asLong(row[0]), (String) row[1], asLong(row[2]), (String) row[3], (String) row[4],
                 asInstant(row[5]), asInstant(row[6]), asBigDecimal(row[7]), (String) row[8], (String) row[9],
-                asInstant(row[10]), (String) row[11], asInstant(row[12]), asLong(row[13]),
+                asInstant(row[10]), (String) row[11], asInstant(row[12]), (String) row[13],
                 (String) row[14], (String) row[15], asInstant(row[16]),
                 row[17] == null ? 0 : ((Number) row[17]).intValue(), (String) row[18]);
     }
