@@ -44,7 +44,6 @@ app:
     max-age: ${REFRESH_COOKIE_MAX_AGE}
   cors:
     allowed-origins: ${CORS_ORIGINS}
-  front-end-setup-password-url: ${FRONT_END_SETUP_PASSWORD_URL} # TODO: Gắn link trang nhập mật khẩu vào biến
   payment:
     vietqr:
       bank-id: ${VIETQR_BANK_ID:}
@@ -58,6 +57,7 @@ app:
   orders:
     overdue-days: ${ORDER_OVERDUE_DAYS:7}
   frontend:
+    setup-password-url: ${SETUP_PASSWORD_URL} # TODO: Gắn link trang nhập mật khẩu vào biến
     public-lookup-url: ${PUBLIC_LOOKUP_URL:http://localhost:5173/track-order}
 
 springdoc:

@@ -134,7 +134,8 @@ public class PaymentService {
         String auditAction = request.resolution() == PaymentResolution.REFUNDED
                 ? "PAYMENT_REFUND"
                 : "PAYMENT_VOID";
-        auditLogPort.record(adminId, auditAction, "payment", payment.getId(),
+        // Giá trị phải khớp tên enum AuditAction/EntityType của module log, nếu không đọc nhật ký sẽ lỗi
+        auditLogPort.record(adminId, auditAction, "PAYMENT", payment.getId(),
                 "{\"status\":\"" + previousStatus + "\"}",
                 "{\"status\":\"" + payment.getStatus() + "\"}",
                 request.reason().trim(), ipAddress);

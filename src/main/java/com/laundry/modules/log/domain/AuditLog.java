@@ -1,10 +1,7 @@
 package com.laundry.modules.log.domain;
 
 import com.laundry.common.entity.BaseEntity;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Index;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import java.util.Map;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -20,10 +17,10 @@ import org.hibernate.type.SqlTypes;
 @Table(
         name = "audit_logs",
         indexes = {
-                @Index(name = "idx_audit_logs_entity_type", columnList = "entityType"),
-                @Index(name = "idx_audit_logs_entity_id", columnList = "entityId"),
-                @Index(name = "idx_audit_logs_action", columnList = "action"),
-                @Index(name = "idx_audit_logs_created_at", columnList = "createdAt")
+                @Index(name = "idx_audit_logs_entity",     columnList = "entity_type, entity_id"),
+                @Index(name = "idx_audit_logs_action",     columnList = "action"),
+                @Index(name = "idx_audit_logs_user_id",    columnList = "user_id"),
+                @Index(name = "idx_audit_logs_created_at", columnList = "created_at")
         }
 )
 public class AuditLog extends BaseEntity {
@@ -31,11 +28,13 @@ public class AuditLog extends BaseEntity {
     @Column(name = "user_id", nullable = false)
     Long userId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "action", nullable = false, length = 40)
-    String action;
+    AuditAction action;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "entity_type", nullable = false, length = 30)
-    String entityType;
+    EntityType entityType;
 
     @Column(name = "entity_id", nullable = false)
     Long entityId;
@@ -53,5 +52,6 @@ public class AuditLog extends BaseEntity {
 
     @Column(name = "ip_address", length = 45)
     String ipAddress;
+
 
 }

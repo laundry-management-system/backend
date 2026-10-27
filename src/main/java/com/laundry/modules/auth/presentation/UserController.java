@@ -1,10 +1,7 @@
 package com.laundry.modules.auth.presentation;
 
 import com.laundry.modules.auth.application.UserService;
-import com.laundry.modules.auth.application.dto.CreateUserRequest;
-import com.laundry.modules.auth.application.dto.SetupPasswordRequest;
-import com.laundry.modules.auth.application.dto.UpdateUserRequest;
-import com.laundry.modules.auth.application.dto.UserResponse;
+import com.laundry.modules.auth.application.dto.*;
 import com.laundry.modules.auth.domain.Status;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -38,6 +35,7 @@ public class UserController {
     @Operation(summary = "Lấy thông tin nhân viên", description = "API lấy thông tin nhân viên theo ID")
     @GetMapping("/{userId}")
     @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN')")
     public UserResponse getUserById(@PathVariable Long userId) {
         return userService.getUserById(userId);
     }
@@ -74,9 +72,9 @@ public class UserController {
     @Operation(summary = "Cập nhật thông tin của bản thân", description = "API cập nhật thông tin của bản thân")
     @PatchMapping("/me")
     @ResponseStatus(HttpStatus.OK)
-    public UserResponse updateMyInfo(@RequestBody @Valid UpdateUserRequest updateUserRequest,
+    public UserResponse updateMyInfo(@RequestBody @Valid UpdateMyProfileRequest request,
                                      Authentication authentication) {
-    return userService.updateMyProfile(authentication.getName(), updateUserRequest);
+    return userService.updateMyProfile(authentication.getName(), request);
     }
 
     @Operation(summary = "Xóa nhân viên", description = "API xóa nhân viên theo ID")
@@ -106,7 +104,7 @@ public class UserController {
     @Operation(summary = "Thiết lập mật khẩu", description = "API cho phép nhân viên thiết lập mật khẩu")
     @PostMapping("/setup-password")
     @ResponseStatus(HttpStatus.OK)
-    public void setupPassword(@RequestParam String token, @RequestBody SetupPasswordRequest request){
+    public void setupPassword(@RequestParam String token, @RequestBody @Valid SetupPasswordRequest request){
         userService.setupPassword(token, request);
     }
 }
