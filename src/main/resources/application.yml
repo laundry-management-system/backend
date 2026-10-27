@@ -1,3 +1,6 @@
+server:
+  port: ${PORT:8080}
+
 spring:
   application:
     name: laundry
@@ -25,6 +28,8 @@ spring:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT}
       password: ${REDIS_PASSWORD:laundry}
+      ssl:
+        enabled: ${REDIS_SSL:false}
 
 app:
   upload-dir: ${UPLOAD_DIR:uploads}
@@ -39,8 +44,21 @@ app:
     max-age: ${REFRESH_COOKIE_MAX_AGE}
   cors:
     allowed-origins: ${CORS_ORIGINS}
+  payment:
+    vietqr:
+      bank-id: ${VIETQR_BANK_ID:}
+      account-no: ${VIETQR_ACCOUNT_NO:}
+      account-name: ${VIETQR_ACCOUNT_NAME:}
+      template: ${VIETQR_TEMPLATE:compact2}
+      image-base-url: ${VIETQR_IMAGE_BASE_URL:https://img.vietqr.io/image}
+  public-lookup:
+    max-attempts: ${PUBLIC_LOOKUP_MAX_ATTEMPTS:10}
+    window-seconds: ${PUBLIC_LOOKUP_WINDOW_SECONDS:60}
+  orders:
+    overdue-days: ${ORDER_OVERDUE_DAYS:7}
   frontend:
     setup-password-url: ${SETUP_PASSWORD_URL} # TODO: Gắn link trang nhập mật khẩu vào biến
+    public-lookup-url: ${PUBLIC_LOOKUP_URL:http://localhost:5173/track-order}
 
 springdoc:
   swagger-ui:
