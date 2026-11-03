@@ -14,8 +14,6 @@ import com.laundry.modules.log.domain.AuditLogRepository;
 import com.laundry.modules.log.domain.AuditLogSpecs;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Stream;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -123,16 +121,13 @@ public class AuditLogService {
                 Math.clamp(size, 1, 100),
                 sort);
 
-        // Spec trả null khi bộ lọc trống; Spring Data 4 không nhận null trong and() nên lọc bỏ trước khi ghép
-        Specification<AuditLog> specs = Specification.allOf(Stream.of(
-                        AuditLogSpecs.hasAction(filter.action()),
-                        AuditLogSpecs.hasEntityType(filter.entityType()),
-                        AuditLogSpecs.hasEntityId(filter.entityId()),
-                        AuditLogSpecs.hasUserId(filter.userId()),
-                        AuditLogSpecs.createdFrom(filter.from()),
-                        AuditLogSpecs.createdBefore(filter.to()))
-                .filter(Objects::nonNull)
-                .toList());
+        Specification<AuditLog> specs = Specification
+                .where(AuditLogSpecs.hasAction(filter.action()))
+                .and(AuditLogSpecs.hasEntityType(filter.entityType()))
+                .and(AuditLogSpecs.hasEntityId(filter.entityId()))
+                .and(AuditLogSpecs.hasUserId(filter.userId()))
+                .and(AuditLogSpecs.createdFrom(filter.from()))
+                .and(AuditLogSpecs.createdBefore(filter.to()));
 
         Page<AuditLog> result = auditLogRepository.findAll(specs, pageable);
         Set<Long> ids = result.getContent()

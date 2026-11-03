@@ -13,7 +13,6 @@ public enum AuditAction {
     ORDER_PRICE_EDIT,
     PAYMENT_CONFIRM,
     PAYMENT_VOID(true),
-    PAYMENT_REFUND(true),
     PRICE_CHANGE,
     SET_UP_PASSWORD,
     STATUS_ROLLBACK(true),

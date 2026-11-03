@@ -7,8 +7,5 @@ public enum EntityType {
     ORDER,
     PAYMENT,
     SERVICE,
-    SETTING,
-    MACHINE,
-    VOUCHER,
-    INCIDENT
+    SETTING
 }

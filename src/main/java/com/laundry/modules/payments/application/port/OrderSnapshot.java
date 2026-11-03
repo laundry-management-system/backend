@@ -18,7 +18,7 @@ public record OrderSnapshot(
         Instant completedAt,
         String shelfLocation,
         Instant deliveredAt,
-        String deliveredBy,
+        Long deliveredBy,
         String receiverName,
         String receiverRelation,
         Instant lastNotifiedAt,

@@ -16,7 +16,7 @@ public record DeliveryResponse(
         Instant paidAt,
         String status,
         Instant deliveredAt,
-        String deliveredBy,
+        Long deliveredBy,
         String receiverName,
         String receiverRelation
 ) {
