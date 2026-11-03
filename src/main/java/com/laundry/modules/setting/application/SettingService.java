@@ -38,10 +38,11 @@ public class SettingService {
                 .orElseThrow(() -> NotFoundException.of("Tham số", settingKey.name()));
 
         oldD.getSettingKey().validate(request.value());
-        Setting newD = oldD.update(request.value(), resolver.resolveId(username));
-        settingRepository.save(newD);
+        // update() sửa trực tiếp entity nên phải chụp dữ liệu cũ trước, nếu không log cũ = mới
+        Map<String, Object> oldData = toJson(oldD);
+        Setting newD = settingRepository.saveAndFlush(oldD.update(request.value(), resolver.resolveId(username)));
 
-        log(oldD, newD);
+        log(newD, oldData, toJson(newD));
 
         return SettingResponse.from(newD);
     }
@@ -52,18 +53,19 @@ public class SettingService {
         result.put("settingValue", data.getSettingValue());
         result.put("description", data.getDescription());
         result.put("updatedBy", data.getUpdatedBy());
-        result.put("updatedAt", data.getUpdatedAt());
+        // Ghi chuỗi ISO; để Instant thì cột json lưu thành số giây dạng float
+        result.put("updatedAt", data.getUpdatedAt() == null ? null : data.getUpdatedAt().toString());
 
         return result;
     }
 
-    private void log(Setting oldD, Setting newD){
+    private void log(Setting setting, Map<String, Object> oldData, Map<String, Object> newData){
         auditLogService.log(new AuditEntry(
                 AuditAction.SETTING_UPDATED,
                 EntityType.SETTING,
-                (long) oldD.getSettingKey().ordinal(), // Do Setting lưu PK là SettingKey (VARCHAR) nên k thể log entityID là Long như bình thường nên lấy thứ tự của enum thay
-                toJson(oldD),
-                toJson(newD),
+                (long) setting.getSettingKey().ordinal(), // Do Setting lưu PK là SettingKey (VARCHAR) nên k thể log entityID là Long như bình thường nên lấy thứ tự của enum thay
+                oldData,
+                newData,
                 null
         ));
     }

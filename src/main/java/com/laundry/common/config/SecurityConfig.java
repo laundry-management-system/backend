@@ -28,8 +28,8 @@ public class SecurityConfig {
     private static final String[] PUBLIC_PATHS = {
             "/api/health",
             "/api/auth/**",
-            "/api/users/setup-password",
             "/api/public/orders/lookup",
+            "/api/users/setup-password",
             "/api/orders/track",
             "/api/orders/track/**",
             // Ảnh/file đã upload: <img> không gửi được JWT, tên file là UUID
@@ -63,6 +63,15 @@ public class SecurityConfig {
                 .build();
     }
 
+    private static void writeProblem(HttpServletResponse res, int status, String detail) throws IOException {
+        res.setStatus(status);
+        res.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        res.setCharacterEncoding("UTF-8");
+        res.getWriter().write("""
+                {"status":%d,"title":"%s","detail":"%s"}
+                """.formatted(status, status == 401 ? "Unauthorized" : "Forbidden", detail));
+    }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -71,12 +80,5 @@ public class SecurityConfig {
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
-    }
-
-    private static void writeProblem(HttpServletResponse res, int status, String detail) throws IOException {
-        res.setStatus(status);
-        res.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-        res.setCharacterEncoding("UTF-8");
-        res.getWriter().write("{\"type\":\"about:blank\",\"status\":%d,\"detail\":\"%s\"}".formatted(status, detail));
     }
 }

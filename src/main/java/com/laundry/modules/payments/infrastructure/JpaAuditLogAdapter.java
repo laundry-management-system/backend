@@ -19,11 +19,11 @@ public class JpaAuditLogAdapter implements AuditLogPort {
         entityManager.createNativeQuery("""
                         INSERT INTO audit_logs
                             (user_id, action, entity_type, entity_id, old_data, new_data,
-                             reason, ip_address, created_at)
+                             reason, ip_address, created_at, updated_at)
                         VALUES
                             (:actorId, :action, :entityType, :entityId,
                              CAST(:oldDataJson AS json), CAST(:newDataJson AS json),
-                             :reason, :ipAddress, CURRENT_TIMESTAMP)
+                             :reason, :ipAddress, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                         """)
                 .setParameter("actorId", actorId)
                 .setParameter("action", action)

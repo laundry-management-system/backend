@@ -12,7 +12,7 @@ public interface OrderIntegration {
 
     void setPaymentStatus(long orderId, boolean paid);
 
-    void deliver(long orderId, Instant deliveredAt, long deliveredBy, String receiverName, String receiverRelation);
+    void deliver(long orderId, Instant deliveredAt, String deliveredBy, String receiverName, String receiverRelation);
 
     void recordReminder(long orderId, Instant remindedAt);
 

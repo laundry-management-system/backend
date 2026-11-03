@@ -1,7 +1,6 @@
 package com.laundry.modules.payments.application;
 
 import com.laundry.common.exception.BusinessException;
-import com.laundry.common.security.ActorIdResolver;
 import com.laundry.modules.payments.application.dto.DeliveryRequest;
 import com.laundry.modules.payments.application.dto.DeliveryResponse;
 import com.laundry.modules.payments.application.port.OrderIntegration;
@@ -21,7 +20,6 @@ public class DeliveryService {
 
     private final OrderIntegration orderIntegration;
     private final PaymentRepository paymentRepository;
-    private final ActorIdResolver actorIdResolver;
 
     @Transactional
     public DeliveryResponse deliver(String orderCode, DeliveryRequest request, String username) {
@@ -46,12 +44,11 @@ public class DeliveryService {
                 .findFirst()
                 .orElseThrow(() -> new BusinessException("Đơn đang ở trạng thái đã thanh toán nhưng thiếu giao dịch"));
         Instant deliveredAt = Instant.now();
-        long deliveredBy = actorIdResolver.resolveId(username);
-        orderIntegration.deliver(order.id(), deliveredAt, deliveredBy, receiverName, receiverRelation);
+        orderIntegration.deliver(order.id(), deliveredAt, username, receiverName, receiverRelation);
 
         return new DeliveryResponse(order.orderCode(), order.customerName(), order.customerPhone(), order.dueAt(),
                 order.totalAmount(), confirmedPayment.getInvoiceNo(), confirmedPayment.getMethod(),
-                confirmedPayment.getPaidAt(), "DELIVERED", deliveredAt, deliveredBy, receiverName, receiverRelation);
+                confirmedPayment.getPaidAt(), "DELIVERED", deliveredAt, username, receiverName, receiverRelation);
     }
 
     private static String normalize(String value) {
