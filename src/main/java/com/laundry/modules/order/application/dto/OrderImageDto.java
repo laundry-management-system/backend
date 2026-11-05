@@ -2,7 +2,6 @@ package com.laundry.modules.order.application.dto;
 
 import com.laundry.modules.order.domain.OrderImage;
 import io.swagger.v3.oas.annotations.media.Schema;
-
 import java.time.Instant;
 
 @Schema(description = "Ảnh tình trạng đồ khi nhận (ố, rách, có vấn đề)")
