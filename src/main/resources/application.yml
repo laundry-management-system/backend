@@ -68,9 +68,3 @@ mailjet:
   api-key: ${MAILJET_API_KEY}
   secret-key: ${MAILJET_SECRET_KEY}
   sender-email: ${MAILJET_SENDER_EMAIL}
-  sender-name: Laundry
-
-logging:
-  level:
-    org.springframework.web: DEBUG
-    org.springframework.web.servlet.DispatcherServlet: DEBUG

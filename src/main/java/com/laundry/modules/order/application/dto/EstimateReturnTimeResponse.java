@@ -1,7 +1,6 @@
 package com.laundry.modules.order.application.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-
 import java.time.Instant;
 
 @Schema(description = "Response gợi ý thời gian hẹn trả đồ")

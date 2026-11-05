@@ -1,9 +1,8 @@
 package com.laundry.modules.order.domain;
 
+import java.math.BigDecimal;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-
-import java.math.BigDecimal;
 
 @Getter
 @RequiredArgsConstructor

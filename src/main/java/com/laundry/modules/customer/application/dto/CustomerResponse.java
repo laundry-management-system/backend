@@ -2,7 +2,6 @@ package com.laundry.modules.customer.application.dto;
 
 import com.laundry.modules.customer.domain.Customer;
 import com.laundry.modules.customer.domain.CustomerStatus;
-
 import java.time.Instant;
 
 public record CustomerResponse(

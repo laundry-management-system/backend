@@ -1,9 +1,8 @@
 package com.laundry.modules.order.domain;
 
+import java.util.List;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-
-import java.util.List;
 
 @Getter
 @RequiredArgsConstructor

@@ -3,7 +3,6 @@ package com.laundry.modules.setting.application.dto;
 import com.laundry.modules.setting.domain.Setting;
 import com.laundry.modules.setting.domain.SettingKey;
 import io.swagger.v3.oas.annotations.media.Schema;
-
 import java.time.Instant;
 
 @Schema(description = "Response chưa thông tin tham số của hệ thống")

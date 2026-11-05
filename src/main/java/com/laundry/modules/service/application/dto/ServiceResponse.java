@@ -3,7 +3,6 @@ package com.laundry.modules.service.application.dto;
 import com.laundry.modules.service.domain.LaundryService;
 import com.laundry.modules.service.domain.ServiceStatus;
 import com.laundry.modules.service.domain.ServiceUnit;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 

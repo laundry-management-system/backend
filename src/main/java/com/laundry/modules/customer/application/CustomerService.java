@@ -8,15 +8,14 @@ import com.laundry.modules.customer.application.dto.UpdateCustomerRequest;
 import com.laundry.modules.customer.domain.Customer;
 import com.laundry.modules.customer.domain.CustomerRepository;
 import com.laundry.modules.customer.domain.CustomerStatus;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
