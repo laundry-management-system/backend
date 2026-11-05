@@ -1,7 +1,6 @@
 package com.laundry.modules.payments.application.dto;
 
 import com.laundry.modules.payments.domain.PaymentMethod;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 

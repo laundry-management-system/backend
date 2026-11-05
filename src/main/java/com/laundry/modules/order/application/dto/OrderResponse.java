@@ -7,7 +7,6 @@ import com.laundry.modules.order.domain.OrderType;
 import com.laundry.modules.order.domain.PaymentStatus;
 import com.laundry.modules.order.domain.ServiceType;
 import io.swagger.v3.oas.annotations.media.Schema;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 

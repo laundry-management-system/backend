@@ -3,7 +3,6 @@ package com.laundry.modules.payments.application.dto;
 import com.laundry.modules.payments.domain.Payment;
 import com.laundry.modules.payments.domain.PaymentMethod;
 import com.laundry.modules.payments.domain.PaymentStatus;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 

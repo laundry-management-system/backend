@@ -5,7 +5,6 @@ import com.laundry.modules.service.domain.ServiceUnit;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
-
 import java.math.BigDecimal;
 
 public record UpdateServiceRequest(
