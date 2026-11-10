@@ -239,6 +239,10 @@ public class Order extends BaseEntity {
         addHistory(HistoryActionType.ITEMS_UPDATED, null, totalPieces + " dòng món", "Nhân viên kiểm đếm và phân loại chi tiết", performedBy);
     }
 
+    /**
+     * Chỉ dùng cho bước Mới nhận → Đang xử lý. Hoàn thành, giao đồ và hủy có API riêng kèm kiểm tra
+     * (xếp kệ, thanh toán, BR-D05), nên không được đi tắt qua đây.
+     */
     public void changeStatus(OrderStatus newStatus, String reason, String performedBy) {
         if (this.status.isTerminal()) {
             throw new BusinessException("Đơn hàng đang ở trạng thái '" + this.status.getDescription() + "', không thể chuyển tiếp");
@@ -246,14 +250,19 @@ public class Order extends BaseEntity {
         if (this.status == newStatus) {
             throw new BusinessException("Đơn hàng đã ở trạng thái '" + newStatus.getDescription() + "'");
         }
+        if (newStatus != OrderStatus.PROCESSING || this.status != OrderStatus.RECEIVED) {
+            throw new BusinessException(switch (newStatus) {
+                case COMPLETED -> "Dùng chức năng Hoàn thành (kèm vị trí kệ) để chuyển đơn sang Hoàn thành";
+                case DELIVERED -> "Dùng chức năng Giao đồ / Thanh toán & giao để giao đơn";
+                case CANCELLED -> "Dùng chức năng Hủy đơn để hủy";
+                default -> "Chỉ chuyển được từ Mới nhận sang Đang xử lý; muốn lùi trạng thái hãy dùng chức năng Lùi trạng thái";
+            }, "newStatus");
+        }
+        if (isIntakeV3() && this.items.isEmpty()) {
+            throw new BusinessException("Đơn chưa phân loại (chưa có dòng đồ và giá), không thể bắt đầu xử lý");
+        }
         OrderStatus oldStatus = this.status;
         this.status = newStatus;
-        if (newStatus == OrderStatus.COMPLETED) {
-            this.completedAt = Instant.now();
-        } else if (newStatus == OrderStatus.DELIVERED) {
-            this.deliveredAt = Instant.now();
-            this.deliveredBy = performedBy;
-        }
         addHistory(HistoryActionType.STATUS_CHANGE, oldStatus.name(), newStatus.name(), reason, performedBy);
     }
 
@@ -270,28 +279,18 @@ public class Order extends BaseEntity {
                 performedBy);
     }
 
-    public void deliver(String receiverName, String receiverRelation, String performedBy) {
-        if (this.status != OrderStatus.COMPLETED) {
-            throw new BusinessException("Đơn hàng phải ở trạng thái 'Hoàn thành / Chờ lấy' mới có thể giao đồ");
-        }
-        OrderStatus oldStatus = this.status;
-        this.status = OrderStatus.DELIVERED;
-        this.deliveredAt = Instant.now();
-        this.deliveredBy = performedBy;
-        this.receiverName = receiverName != null ? receiverName.trim() : null;
-        this.receiverRelation = receiverRelation != null ? receiverRelation.trim() : null;
-        String note = (this.receiverName != null && !this.receiverName.isBlank())
-                ? "Giao cho người nhận hộ: " + this.receiverName + " (" + this.receiverRelation + ")"
-                : "Giao đồ trực tiếp cho khách hàng";
-        addHistory(HistoryActionType.STATUS_CHANGE, oldStatus.name(), OrderStatus.DELIVERED.name(), note, performedBy);
-    }
-
     public void revertStatus(OrderStatus targetStatus, String reason, String performedBy) {
         if (this.status.isTerminal()) {
             throw new BusinessException("Không thể lùi trạng thái của đơn hàng đã kết thúc");
         }
         if (reason == null || reason.isBlank()) {
             throw new BusinessException("Bắt buộc phải nhập lý do khi lùi trạng thái đơn hàng (BR-D06)");
+        }
+        // Chỉ lùi về công đoạn trước trong luồng Mới nhận → Đang xử lý → Hoàn thành
+        List<OrderStatus> flow = OrderStatus.getStandardFlow();
+        if (!flow.contains(targetStatus) || flow.indexOf(targetStatus) >= flow.indexOf(this.status)) {
+            throw new BusinessException("Chỉ lùi được về trạng thái trước trạng thái hiện tại ("
+                    + this.status.getDescription() + ")", "targetStatus");
         }
         OrderStatus oldStatus = this.status;
         this.status = targetStatus;
@@ -317,6 +316,12 @@ public class Order extends BaseEntity {
         if (this.status == OrderStatus.DELIVERED) {
             throw new BusinessException("Không thể sửa giá đơn hàng đã giao (BR-D12)");
         }
+        if (this.status == OrderStatus.CANCELLED) {
+            throw new BusinessException("Không thể sửa giá đơn hàng đã hủy");
+        }
+        if (this.paymentStatus == PaymentStatus.PAID) {
+            throw new BusinessException("Đơn đã thanh toán: hủy xác nhận thanh toán trước khi sửa giá");
+        }
         if (newAmount == null || newAmount.compareTo(BigDecimal.ZERO) < 0) {
             throw new BusinessException("Giá tiền điều chỉnh không hợp lệ");
         }
@@ -328,12 +333,14 @@ public class Order extends BaseEntity {
         addHistory(HistoryActionType.PRICE_ADJUST, String.valueOf(oldAmount), String.valueOf(newAmount), reason, performedBy);
     }
 
+    /** BR-D05: chỉ hủy được đơn Mới nhận. Hoàn tiền và trả lượt voucher do OrderService xử lý trước khi gọi. */
     public void cancel(String reason, String performedBy) {
-        if (this.status == OrderStatus.DELIVERED) {
-            throw new BusinessException("Không thể hủy đơn hàng đã giao");
-        }
         if (this.status == OrderStatus.CANCELLED) {
             throw new BusinessException("Đơn hàng này đã bị hủy trước đó");
+        }
+        if (this.status != OrderStatus.RECEIVED) {
+            throw new BusinessException("Chỉ hủy được đơn ở trạng thái Mới nhận (BR-D05); đơn đang "
+                    + this.status.getDescription());
         }
         if (reason == null || reason.isBlank()) {
             throw new BusinessException("Bắt buộc phải nhập lý do hủy đơn hàng (BR-D05)");
@@ -341,6 +348,13 @@ public class Order extends BaseEntity {
         OrderStatus oldStatus = this.status;
         this.status = OrderStatus.CANCELLED;
         addHistory(HistoryActionType.CANCELLED, oldStatus.name(), OrderStatus.CANCELLED.name(), reason, performedBy);
+    }
+
+    /** Ghi nhận đã hoàn tiền giao dịch của đơn (khi hủy đơn đã thanh toán). */
+    public void markRefunded(String reason, String performedBy) {
+        if (this.paymentStatus != PaymentStatus.PAID) return;
+        this.paymentStatus = PaymentStatus.UNPAID;
+        addHistory(HistoryActionType.PAYMENT_VOIDED, "CONFIRMED", "REFUNDED", reason, performedBy);
     }
 
     public void markReceiptPrinted() {

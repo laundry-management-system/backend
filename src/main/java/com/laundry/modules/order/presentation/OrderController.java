@@ -6,17 +6,12 @@ import com.laundry.modules.order.application.dto.AdjustPriceRequest;
 import com.laundry.modules.order.application.dto.CancelOrderRequest;
 import com.laundry.modules.order.application.dto.ChangeStatusRequest;
 import com.laundry.modules.order.application.dto.CompleteOrderRequest;
-import com.laundry.modules.order.application.dto.CustomerTrackingResponse;
-import com.laundry.modules.order.application.dto.DeliverOrderRequest;
-import com.laundry.modules.order.application.dto.EstimateReturnTimeRequest;
-import com.laundry.modules.order.application.dto.EstimateReturnTimeResponse;
 import com.laundry.modules.order.application.dto.IntakeRequest;
 import com.laundry.modules.order.application.dto.IntakeResponse;
 import com.laundry.modules.order.application.dto.OrderDetailResponse;
 import com.laundry.modules.order.application.dto.OrderImageDto;
 import com.laundry.modules.order.application.dto.OrderReceiptResponse;
 import com.laundry.modules.order.application.dto.OrderResponse;
-import com.laundry.modules.order.application.dto.QuickCreateOrderRequest;
 import com.laundry.modules.order.application.dto.RescheduleOrderRequest;
 import com.laundry.modules.order.application.dto.RevertStatusRequest;
 import com.laundry.modules.order.application.dto.UpdateOrderItemsRequest;
@@ -33,6 +28,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -45,8 +41,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @Tag(name = "Order Management", description = "Quản lý đơn hàng giặt ủi (M3 - Thành viên 3: UC04-UC09, UC21, UC22)")
 @RestController
 @RequestMapping("/api/orders")
@@ -55,18 +49,7 @@ public class OrderController {
 
     private final OrderService orderService;
 
-    @Operation(summary = "Tiếp nhận đồ & tạo đơn (UC04 / BM3 - Fast Check-in)")
-    @PostMapping("/quick-create")
-    @ResponseStatus(HttpStatus.CREATED)
-    public OrderDetailResponse quickCreate(
-            @Valid @RequestBody QuickCreateOrderRequest request,
-            Authentication authentication
-    ) {
-        String staff = getUsername(authentication);
-        return orderService.quickCreate(request, staff);
-    }
-
-    @Operation(summary = "Tiếp nhận đồ v3: tạo lượt nhận 1–2 đơn (Tiêu chuẩn / Giặt nhanh), chưa có dòng đồ và giá")
+    @Operation(summary = "Tiếp nhận đồ: tạo lượt nhận 1–2 đơn (Tiêu chuẩn / Giặt nhanh), chưa có dòng đồ và giá")
     @PostMapping("/intake")
     public ResponseEntity<IntakeResponse> createIntake(
             @Valid @RequestBody IntakeRequest request,
@@ -90,23 +73,14 @@ public class OrderController {
         return orderService.getReceipt(id, baseUrl);
     }
 
-    @Operation(summary = "Tính tiền & gợi ý ngày hẹn (UC04 - include)")
-    @PostMapping("/estimate-return-time")
-    public EstimateReturnTimeResponse estimateReturnTime(
-            @Valid @RequestBody EstimateReturnTimeRequest request
-    ) {
-        return orderService.estimateReturnTime(request);
-    }
-
-    @Operation(summary = "Nhập danh sách chi tiết các món đồ sau khi kiểm đếm (UC04)")
+    @Operation(summary = "Phân loại & chốt giá: nhập dòng đồ, áp voucher (UC04)")
     @PutMapping("/{id}/items")
     public OrderDetailResponse updateItems(
             @PathVariable Long id,
             @Valid @RequestBody UpdateOrderItemsRequest request,
             Authentication authentication
     ) {
-        String staff = getUsername(authentication);
-        return orderService.updateItems(id, request, staff);
+        return orderService.updateItems(id, request, getUsername(authentication));
     }
 
     @Operation(summary = "Đính kèm ảnh tình trạng món đồ có vấn đề (ố, rách - UC04 extend)")
@@ -118,12 +92,6 @@ public class OrderController {
             @Valid @RequestBody AddOrderItemImageRequest request
     ) {
         return orderService.addOrderItemImage(orderId, itemId, request);
-    }
-
-    @Operation(summary = "Khách hàng tra cứu tiến độ đơn qua Số điện thoại (UC29 / BM6 - Public)")
-    @GetMapping("/track")
-    public List<CustomerTrackingResponse> trackByPhone(@RequestParam String phone) {
-        return orderService.trackByPhone(phone);
     }
 
     @Operation(summary = "Xem danh sách công việc & lọc đơn (UC07 / BM4)")
@@ -145,15 +113,14 @@ public class OrderController {
         return orderService.getOrderDetail(id);
     }
 
-    @Operation(summary = "Cập nhật trạng thái đơn (UC08 / BM5)")
+    @Operation(summary = "Bắt đầu xử lý: Mới nhận → Đang xử lý (UC08). Các trạng thái khác dùng API riêng")
     @PatchMapping("/{id}/status")
     public OrderDetailResponse changeStatus(
             @PathVariable Long id,
             @Valid @RequestBody ChangeStatusRequest request,
             Authentication authentication
     ) {
-        String staff = getUsername(authentication);
-        return orderService.changeStatus(id, request, staff);
+        return orderService.changeStatus(id, request, getUsername(authentication));
     }
 
     @Operation(summary = "Hoàn thành xử lý đồ & gán vị trí kệ (UC08 / QĐ6)")
@@ -163,30 +130,18 @@ public class OrderController {
             @Valid @RequestBody CompleteOrderRequest request,
             Authentication authentication
     ) {
-        String staff = getUsername(authentication);
-        return orderService.completeOrder(id, request, staff);
+        return orderService.completeOrder(id, request, getUsername(authentication));
     }
 
-    @Operation(summary = "Giao đồ cho khách hoặc người nhận hộ (UC12 / QĐ9)")
-    @PostMapping("/{id}/deliver")
-    public OrderDetailResponse deliverOrder(
-            @PathVariable Long id,
-            @Valid @RequestBody DeliverOrderRequest request,
-            Authentication authentication
-    ) {
-        String staff = getUsername(authentication);
-        return orderService.deliverOrder(id, request, staff);
-    }
-
-    @Operation(summary = "Lùi trạng thái đơn kèm lý do bắt buộc (UC22 / BR-D06)")
+    @Operation(summary = "Lùi trạng thái đơn kèm lý do bắt buộc (Admin, UC22 / BR-D06)")
     @PostMapping("/{id}/revert-status")
+    @PreAuthorize("hasRole('ADMIN')")
     public OrderDetailResponse revertStatus(
             @PathVariable Long id,
             @Valid @RequestBody RevertStatusRequest request,
             Authentication authentication
     ) {
-        String staff = getUsername(authentication);
-        return orderService.revertStatus(id, request, staff);
+        return orderService.revertStatus(id, request, getUsername(authentication));
     }
 
     @Operation(summary = "Dời ngày hẹn trả kèm lý do bắt buộc (UC06 / BR-D08)")
@@ -196,30 +151,28 @@ public class OrderController {
             @Valid @RequestBody RescheduleOrderRequest request,
             Authentication authentication
     ) {
-        String staff = getUsername(authentication);
-        return orderService.reschedule(id, request, staff);
+        return orderService.reschedule(id, request, getUsername(authentication));
     }
 
-    @Operation(summary = "Sửa đơn giá / tổng tiền đơn kèm lý do bắt buộc (UC21 / BR-D12)")
+    @Operation(summary = "Sửa tổng tiền đơn kèm lý do bắt buộc (Admin, UC21 / BR-D12). Gỡ voucher nếu có")
     @PatchMapping("/{id}/price")
+    @PreAuthorize("hasRole('ADMIN')")
     public OrderDetailResponse adjustPrice(
             @PathVariable Long id,
             @Valid @RequestBody AdjustPriceRequest request,
             Authentication authentication
     ) {
-        String staff = getUsername(authentication);
-        return orderService.adjustPrice(id, request, staff);
+        return orderService.adjustPrice(id, request, getUsername(authentication));
     }
 
-    @Operation(summary = "Hủy đơn hàng khi Mới nhận kèm lý do (UC05 / BR-D05)")
+    @Operation(summary = "Hủy đơn Mới nhận kèm lý do (UC05 / BR-D05). Đơn đã thanh toán được hoàn tiền, voucher được trả lượt")
     @PostMapping("/{id}/cancel")
     public OrderDetailResponse cancel(
             @PathVariable Long id,
             @Valid @RequestBody CancelOrderRequest request,
             Authentication authentication
     ) {
-        String staff = getUsername(authentication);
-        return orderService.cancel(id, request, staff);
+        return orderService.cancel(id, request, getUsername(authentication));
     }
 
     private String getUsername(Authentication authentication) {
