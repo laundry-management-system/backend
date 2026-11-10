@@ -19,8 +19,34 @@ public record OrderReportResponse(
         List<StatusCount> byStatus,
 
         @Schema(description = "Doanh thu theo dịch vụ, sắp giảm dần theo doanh thu")
-        List<ServiceRevenue> byService
+        List<ServiceRevenue> byService,
+
+        @Schema(description = "Số đơn và giá trị trung bình theo loại đơn (không tính đơn hủy)")
+        List<OrderTypeStat> byOrderType,
+
+        @Schema(description = "Tổng phụ phí và giảm giá của các đơn không hủy")
+        Surcharges surcharges
 ) {
+
+    @Schema(description = "Thống kê một loại đơn")
+    public record OrderTypeStat(
+            @Schema(description = "NORMAL (Tiêu chuẩn) / EXPRESS (Giặt nhanh)")
+            String orderType,
+            long orderCount,
+            BigDecimal totalAmount,
+            @Schema(description = "Giá trị trung bình một đơn, làm tròn tới đồng")
+            BigDecimal averageAmount
+    ) {}
+
+    @Schema(description = "Phụ phí và giảm giá")
+    public record Surcharges(
+            @Schema(description = "Tổng phụ phí giặt nhanh")
+            BigDecimal expressFee,
+            @Schema(description = "Tổng phụ phí giặt riêng đồ trắng")
+            BigDecimal whitesFee,
+            @Schema(description = "Tổng giảm giá (voucher và phiếu sự cố)")
+            BigDecimal discount
+    ) {}
 
     @Schema(description = "Tổng hợp đơn hàng trong kỳ")
     public record Summary(

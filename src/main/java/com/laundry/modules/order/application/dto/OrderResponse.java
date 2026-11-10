@@ -33,7 +33,10 @@ public record OrderResponse(
         Instant dueAt,
         Instant createdAt,
         String intakeCode,
-        Boolean washWhitesSeparately
+        Boolean washWhitesSeparately,
+        @Schema(description = "Đã phân loại (đơn v3 đã có dòng đồ và giá)")
+        boolean classified,
+        Long customerId
 ) {
     public static OrderResponse from(Order order) {
         int itemsCount = order.getItems() != null
@@ -62,7 +65,9 @@ public record OrderResponse(
                 order.getDueAt(),
                 order.getCreatedAt(),
                 order.getIntakeCode(),
-                order.getWashWhitesSeparately()
+                order.getWashWhitesSeparately(),
+                !order.isIntakeV3() || itemsCount > 0,
+                order.getCustomerId()
         );
     }
 }

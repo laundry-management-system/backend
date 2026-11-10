@@ -2,7 +2,6 @@ package com.laundry.modules.auth.application;
 
 import com.laundry.common.exception.BusinessException;
 import com.laundry.common.exception.NotFoundException;
-import com.laundry.common.security.ActorIdResolver;
 import com.laundry.common.security.JwtUtil;
 import com.laundry.modules.auth.application.dto.AuthDTO;
 import com.laundry.modules.auth.application.dto.LoginRequest;
@@ -40,7 +39,6 @@ public class AuthService {
     UserRepository userRepository;
     AuditLogService auditLogService;
     SettingService settingService;
-    ActorIdResolver resolver;
 
     String loginAttemptKeyPrefix = "laundry:auth:login:attempt:";
     String lockKeyPrefix = "laundry:auth:isLocked:";
@@ -112,20 +110,23 @@ public class AuthService {
         int maxAttempts = settingService.getValue(SettingKey.MAX_LOGIN_FAIL, Integer.class);
         int lockMinutes = settingService.getValue(SettingKey.LOCK_MINUTES, Integer.class);
         int attempts = stringRedisTemplate.opsForValue().increment(loginAttemptKeyPrefix + username).intValue();
-        stringRedisTemplate.expire(loginAttemptKeyPrefix + username, Duration.ofMinutes(5));
+        // Cửa sổ đếm số lần sai = LOCK_MINUTES (cấu hình được), thay cho mốc 5 phút ghi cứng
+        stringRedisTemplate.expire(loginAttemptKeyPrefix + username, Duration.ofMinutes(lockMinutes));
 
         if(attempts >= maxAttempts){
             stringRedisTemplate.opsForValue().set(lockKeyPrefix + username, "true", Duration.ofMinutes(lockMinutes));
             stringRedisTemplate.delete(loginAttemptKeyPrefix + username);
 
-            auditLogService.log(new AuditEntry(
+            // Username không tồn tại thì không có tài khoản để ghi nhật ký
+            userRepository.findIdByUsername(username).ifPresent(userId -> auditLogService.log(new AuditEntry(
                     AuditAction.ACCOUNT_LOCKED,
                     EntityType.AUTH,
-                    resolver.resolveId(username),
+                    userId,
                     null,
                     null,
-                    "Đăng nhập sai quá số lần quy định"
-            ));
+                    "Đăng nhập sai quá số lần quy định",
+                    username
+            )));
         }
     }
 

@@ -4,7 +4,9 @@ import com.laundry.modules.payments.application.CustomerNotificationService;
 import com.laundry.modules.payments.application.DeliveryService;
 import com.laundry.modules.payments.application.OverdueOrderService;
 import com.laundry.modules.payments.application.PaymentDiscrepancyService;
+import com.laundry.modules.payments.application.dto.CheckoutRequest;
 import com.laundry.modules.payments.application.dto.ComposeNotificationRequest;
+import io.swagger.v3.oas.annotations.Operation;
 import com.laundry.modules.payments.application.dto.DeliveryRequest;
 import com.laundry.modules.payments.application.dto.DeliveryResponse;
 import com.laundry.modules.payments.application.dto.NotificationResponse;
@@ -28,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/orders")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'EMPLOYEE')")
+@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
 public class OrderEngagementController {
 
     private final DeliveryService deliveryService;
@@ -36,6 +38,15 @@ public class OrderEngagementController {
     private final OverdueOrderService overdueOrderService;
     private final PaymentDiscrepancyService paymentDiscrepancyService;
 
+    @Operation(summary = "Thu tiền và giao đồ trong một lần (WF-E01→E03). Đơn đã thanh toán trước thì chỉ giao")
+    @PostMapping("/{orderCode}/checkout")
+    public DeliveryResponse checkout(@PathVariable String orderCode,
+                                     @Valid @RequestBody CheckoutRequest request,
+                                     Authentication authentication) {
+        return deliveryService.checkout(orderCode, request, authentication.getName());
+    }
+
+    @Operation(summary = "Giao đồ cho đơn đã hoàn thành và đã thanh toán")
     @PostMapping("/{orderCode}/delivery")
     public DeliveryResponse deliver(@PathVariable String orderCode,
                                     @Valid @RequestBody DeliveryRequest request,

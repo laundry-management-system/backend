@@ -7,7 +7,8 @@ import jakarta.validation.constraints.Size;
 public record PublicOrderLookupRequest(
         @NotBlank(message = "Mã đơn không được để trống")
         @Size(max = 15, message = "Mã đơn tối đa 15 ký tự")
-        @Pattern(regexp = "^LD-[0-9]{8}-[0-9]{3}$", message = "Mã đơn không đúng định dạng")
+        // Tiền tố đổi được qua cài đặt ORDER_CODE_PREFIX nên không ghi cứng "LD"
+        @Pattern(regexp = "^[A-Z0-9]{1,2}-[0-9]{8}-[0-9]{3}$", message = "Mã đơn không đúng định dạng")
         String orderCode,
 
         @NotBlank(message = "Số điện thoại không được để trống")

@@ -231,6 +231,25 @@ public class UserService {
         passwordSetupService.sendSetupMail(user);
     }
 
+    /**
+     * Admin reset mật khẩu nhân viên đã kích hoạt (WF-H08): mật khẩu cũ hết hiệu lực ngay (tài khoản về PENDING,
+     * không đăng nhập và không refresh token được), gửi lại link đặt mật khẩu như lúc tạo tài khoản.
+     */
+    @Transactional
+    public void resetPassword(Long userId, String adminUsername){
+        User user = getUserOrThrow(userId);
+        if (user.getUsername().equals(adminUsername)) {
+            throw new BusinessException("Không tự reset mật khẩu của chính mình; hãy đổi mật khẩu trong hồ sơ");
+        }
+        Map<String, Object> oldData = userToJson(user);
+
+        user.resetPassword();
+        userRepository.save(user);
+        passwordSetupService.sendSetupMail(user);
+
+        audit(AuditAction.PASSWORD_RESET, user.getId(), oldData, userToJson(user));
+    }
+
     @Transactional
     public void setupPassword(String token, SetupPasswordRequest request){
         Long userId = passwordSetupService.consumeToken(token);

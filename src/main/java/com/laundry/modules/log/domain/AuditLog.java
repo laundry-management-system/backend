@@ -39,6 +39,10 @@ public class AuditLog extends BaseEntity {
     @Column(name = "entity_id", nullable = false)
     Long entityId;
 
+    // Mã hiển thị (mã đơn, khóa tham số...): đối tượng có PK không phải số (SETTING) vẫn tra được
+    @Column(name = "entity_code", length = 50)
+    String entityCode;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "old_data", columnDefinition = "jsonb", updatable = false)
     Map<String, Object> oldData;

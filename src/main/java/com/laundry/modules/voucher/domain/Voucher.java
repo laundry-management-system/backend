@@ -1,7 +1,6 @@
 package com.laundry.modules.voucher.domain;
 
 import com.laundry.common.entity.BaseEntity;
-import com.laundry.common.exception.BusinessException;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -19,6 +18,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 
+/**
+ * Phiếu voucher (BM10 / QĐ12, BR-G01→G04).
+ * Cấu trúc bảng giữ đúng bản đã có trên release/qc (cột, độ dài, kiểu created_by) để DB đang chạy không phải đổi.
+ */
 @Entity
 @Table(
         name = "vouchers",
@@ -42,15 +45,18 @@ public class Voucher extends BaseEntity {
     @Column(name = "discount_type", nullable = false, length = 20)
     private DiscountType discountType;
 
+    /** PERCENT: 1–100 (%); AMOUNT: số tiền (đ). */
     @Column(name = "discount_value", nullable = false, precision = 12, scale = 2)
     private BigDecimal discountValue;
 
+    /** Ngày hiệu lực, tính cả hai đầu, theo giờ Việt Nam. */
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
 
     @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
 
+    /** So với tiền hàng (subtotal) của đơn. */
     @Column(name = "min_order_value", nullable = false, precision = 12, scale = 0)
     @Builder.Default
     private BigDecimal minOrderValue = BigDecimal.ZERO;
@@ -58,7 +64,8 @@ public class Voucher extends BaseEntity {
     @Column(name = "max_uses", nullable = false)
     private Integer maxUses;
 
-    @Column(name = "used_count", nullable = false)
+    /** Chỉ đổi bằng câu UPDATE atomic trong VoucherRepository; lưu entity không ghi đè cột này. */
+    @Column(name = "used_count", nullable = false, updatable = false)
     @Builder.Default
     private Integer usedCount = 0;
 
@@ -67,116 +74,37 @@ public class Voucher extends BaseEntity {
     @Builder.Default
     private VoucherStatus status = VoucherStatus.ACTIVE;
 
+    @Column(length = 255)
+    private String description;
+
+    /** Username người tạo (giữ kiểu chuỗi như bảng hiện có). */
     @Column(name = "created_by", length = 50)
     private String createdBy;
 
-    public void validateBusinessRules() {
-        if (discountValue == null || discountValue.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessException("Discount value must be greater than 0");
-        }
-        if (discountType == DiscountType.PERCENT && discountValue.compareTo(BigDecimal.valueOf(100)) > 0) {
-            throw new BusinessException("Percentage discount cannot exceed 100%");
-        }
-        if (startDate == null || endDate == null) {
-            throw new BusinessException("Start date and end date must not be null (BR-G01)");
-        }
-        if (endDate.isBefore(startDate)) {
-            throw new BusinessException("End date must be greater than or equal to start date (BR-G01)");
-        }
-        if (minOrderValue == null || minOrderValue.compareTo(BigDecimal.ZERO) < 0) {
-            throw new BusinessException("Minimum order value must be greater than or equal to 0 (BR-G02)");
-        }
-        if (maxUses == null || maxUses <= 0) {
-            throw new BusinessException("Maximum usage count must be greater than 0 (BR-G03)");
-        }
-        if (usedCount == null || usedCount < 0) {
-            usedCount = 0;
-        }
+    /** Lý do không áp được voucher; null nếu áp được. {@code alreadyHeld}: đơn đang giữ một lượt của voucher này. */
+    public VoucherCheckReason evaluate(BigDecimal subtotal, LocalDate today, boolean alreadyHeld) {
+        if (status == VoucherStatus.DISABLED) return VoucherCheckReason.DISABLED;
+        if (today.isBefore(startDate)) return VoucherCheckReason.NOT_STARTED;
+        if (today.isAfter(endDate)) return VoucherCheckReason.EXPIRED;
+        if (!alreadyHeld && usedCount >= maxUses) return VoucherCheckReason.USED_UP;
+        if (subtotal.compareTo(minOrderValue) < 0) return VoucherCheckReason.BELOW_MIN;
+        return null;
     }
 
-    public boolean isActive() {
-        return this.status == VoucherStatus.ACTIVE;
+    /** Số tiền giảm, làm tròn tới đồng, không vượt tiền hàng (BR-G04). */
+    public BigDecimal discountFor(BigDecimal subtotal) {
+        BigDecimal raw = discountType == DiscountType.PERCENT
+                ? subtotal.multiply(discountValue).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP)
+                : discountValue;
+        return raw.min(subtotal).max(BigDecimal.ZERO);
     }
 
-    public boolean isUsableOn(LocalDate date) {
-        if (date == null) {
-            date = LocalDate.now();
-        }
-        return !date.isBefore(startDate) && !date.isAfter(endDate);
-    }
-
-    public boolean hasAvailableUses() {
-        return usedCount < maxUses;
-    }
-
-    public boolean satisfiesMinOrderValue(BigDecimal orderValue) {
-        if (orderValue == null) {
-            return false;
-        }
-        return orderValue.compareTo(minOrderValue != null ? minOrderValue : BigDecimal.ZERO) >= 0;
-    }
-
-    public BigDecimal calculateDiscount(BigDecimal orderValue) {
-        if (orderValue == null || orderValue.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO;
-        }
-
-        BigDecimal discount;
-        if (discountType == DiscountType.PERCENT) {
-            discount = orderValue.multiply(discountValue).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP);
-        } else {
-            discount = discountValue;
-        }
-
-        return discount.min(orderValue);
-    }
-
-    public void incrementUsedCount() {
-        if (!hasAvailableUses()) {
-            throw new BusinessException("Voucher '" + code + "' has reached its maximum usage limit (BR-G03)");
-        }
-        this.usedCount++;
-    }
-
-    public void decrementUsedCount() {
-        if (this.usedCount > 0) {
-            this.usedCount--;
-        }
-    }
-
-    public void disable() {
-        if (this.status == VoucherStatus.DISABLED) {
-            throw new BusinessException("Voucher is already disabled");
-        }
-        this.status = VoucherStatus.DISABLED;
-    }
-
-    public void activate() {
-        if (this.status == VoucherStatus.ACTIVE) {
-            throw new BusinessException("Voucher is already active");
-        }
-        this.status = VoucherStatus.ACTIVE;
-    }
-
-    public void updateDetails(
-            DiscountType discountType,
-            BigDecimal discountValue,
-            LocalDate startDate,
-            LocalDate endDate,
-            BigDecimal minOrderValue,
-            Integer maxUses
-    ) {
-        this.discountType = discountType;
-        this.discountValue = discountValue;
-        this.startDate = startDate;
-        this.endDate = endDate;
-        this.minOrderValue = minOrderValue != null ? minOrderValue : BigDecimal.ZERO;
-        this.maxUses = maxUses;
-
-        validateBusinessRules();
-
-        if (this.usedCount > this.maxUses) {
-            throw new BusinessException("Maximum uses cannot be less than already used count (" + this.usedCount + ")");
-        }
+    /** Trạng thái hiển thị cho màn quản lý. */
+    public String displayStatus(LocalDate today) {
+        if (status == VoucherStatus.DISABLED) return "DISABLED";
+        if (today.isBefore(startDate)) return "NOT_STARTED";
+        if (today.isAfter(endDate)) return "EXPIRED";
+        if (usedCount >= maxUses) return "USED_UP";
+        return "ACTIVE";
     }
 }

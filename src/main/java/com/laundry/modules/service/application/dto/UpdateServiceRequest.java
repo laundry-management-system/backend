@@ -34,5 +34,9 @@ public record UpdateServiceRequest(
         Boolean whitesApplicable,
 
         // Tùy chọn: đổi trạng thái cùng lúc với thông tin, khỏi gọi thêm PATCH /status
-        ServiceStatus status
+        ServiceStatus status,
+
+        // Tên trường khớp FE (UpdateServiceRequestDto.priceChangeReason); ghi vào nhật ký giá (BR-C02)
+        @Size(max = 500, message = "Lý do tối đa 500 ký tự")
+        String priceChangeReason
 ) {}

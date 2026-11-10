@@ -4,6 +4,7 @@ import com.laundry.modules.voucher.domain.VoucherStatus;
 import jakarta.validation.constraints.NotNull;
 
 public record ChangeVoucherStatusRequest(
-        @NotNull(message = "Status must not be null")
+        @NotNull(message = "Trạng thái không được để trống")
         VoucherStatus status
-) {}
+) {
+}

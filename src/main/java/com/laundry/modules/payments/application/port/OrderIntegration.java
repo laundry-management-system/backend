@@ -18,5 +18,12 @@ public interface OrderIntegration {
 
     void appendNote(long orderId, String note);
 
+    /**
+     * Ghi một dòng vào lịch sử đơn (order_status_history).
+     * {@code actionType} phải khớp tên enum HistoryActionType của module order.
+     */
+    void appendHistory(long orderId, String actionType, String oldValue, String newValue, String reason,
+                       String performedBy);
+
     List<OrderSnapshot> findOverdue(Instant completedBefore);
 }

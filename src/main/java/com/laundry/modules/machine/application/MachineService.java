@@ -52,6 +52,7 @@ public class MachineService {
         machine.validateBusinessRules();
 
         Machine saved = machineRepository.save(machine);
+        audit(AuditAction.MACHINE_MANAGE, saved, null, snapshot(saved), null);
         return MachineResponse.from(saved);
     }
 
@@ -59,6 +60,7 @@ public class MachineService {
     public MachineResponse updateMachine(Long id, UpdateMachineRequest request) {
         Machine machine = machineRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Machine not found with ID: " + id));
+        Map<String, Object> before = snapshot(machine);
 
         machine.updateDetails(
                 request.name(),
@@ -68,6 +70,7 @@ public class MachineService {
         );
 
         Machine saved = machineRepository.save(machine);
+        audit(AuditAction.MACHINE_MANAGE, saved, before, snapshot(saved), null);
         return MachineResponse.from(saved);
     }
 
@@ -84,22 +87,38 @@ public class MachineService {
             throw new AccessDeniedException("Only administrators can retire or restore machines (UC18)");
         }
 
+        String reason = request.reason() == null || request.reason().isBlank() ? null : request.reason().trim();
+        if (targetStatus == MachineStatus.MAINTENANCE && reason == null) {
+            throw new BusinessException("Bắt buộc nhập lý do khi chuyển máy sang Bảo trì", "reason");
+        }
+
         MachineStatus oldStatus = machine.getStatus();
         machine.changeStatus(targetStatus);
 
         Machine saved = machineRepository.save(machine);
 
         // Log audit event per QĐ10 and BM8
-        auditLogService.log(new AuditEntry(
-                AuditAction.MACHINE_STATUS,
-                EntityType.MACHINE,
-                saved.getId(),
-                Map.of("status", oldStatus.name()),
-                Map.of("status", targetStatus.name()),
-                request.reason()
-        ));
+        audit(AuditAction.MACHINE_STATUS, saved, Map.of("status", oldStatus.name()),
+                Map.of("status", targetStatus.name()), reason);
 
         return MachineResponse.from(saved);
+    }
+
+    private void audit(AuditAction action, Machine m, Map<String, Object> before, Map<String, Object> after,
+                       String reason) {
+        auditLogService.log(new AuditEntry(action, EntityType.MACHINE, m.getId(), before, after, reason,
+                m.getMachineCode()));
+    }
+
+    private static Map<String, Object> snapshot(Machine m) {
+        Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("machineCode", m.getMachineCode());
+        data.put("name", m.getName());
+        data.put("type", m.getType().name());
+        data.put("capacityKg", m.getCapacityKg());
+        data.put("status", m.getStatus().name());
+        data.put("note", m.getNote());
+        return data;
     }
 
     @Transactional(readOnly = true)
