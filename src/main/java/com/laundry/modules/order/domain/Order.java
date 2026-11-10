@@ -35,6 +35,7 @@ import java.util.UUID;
                 @Index(name = "idx_orders_order_code", columnList = "orderCode"),
                 @Index(name = "idx_orders_status", columnList = "status"),
                 @Index(name = "idx_orders_due_at", columnList = "dueAt"),
+                @Index(name = "idx_orders_received_at", columnList = "received_at"),
                 @Index(name = "idx_orders_intake_code", columnList = "intake_code")
         },
         uniqueConstraints = @UniqueConstraint(name = "uk_orders_intake_request_type",

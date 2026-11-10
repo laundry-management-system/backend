@@ -8,6 +8,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.AccessLevel;
@@ -19,8 +20,12 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
-@Table(name = "payments", uniqueConstraints = @UniqueConstraint(
-        name = "uk_payments_invoice_no", columnNames = "invoice_no"))
+@Table(name = "payments",
+        uniqueConstraints = @UniqueConstraint(name = "uk_payments_invoice_no", columnNames = "invoice_no"),
+        indexes = {
+                @Index(name = "idx_payments_order_id", columnList = "order_id"),
+                @Index(name = "idx_payments_paid_at", columnList = "paid_at")
+        })
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Payment {
