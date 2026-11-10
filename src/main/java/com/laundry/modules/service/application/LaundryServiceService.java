@@ -13,8 +13,17 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.laundry.modules.log.application.AuditLogService;
+import com.laundry.modules.log.application.dto.AuditEntry;
+import com.laundry.modules.log.application.dto.AuditLogDetailResponse;
+import com.laundry.modules.log.domain.AuditAction;
+import com.laundry.modules.log.domain.EntityType;
+
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.math.BigDecimal;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -22,6 +31,7 @@ import java.util.UUID;
 public class LaundryServiceService {
 
     private final LaundryServiceRepository serviceRepository;
+    private final AuditLogService auditLogService;
 
     public Page<ServiceResponse> listServices(String search, ServiceStatus status, Pageable pageable) {
         String term = search != null ? search.trim() : "";
@@ -69,6 +79,8 @@ public class LaundryServiceService {
         LaundryService saved = serviceRepository.saveAndFlush(service);
         saved.setServiceCode(String.format("DV%02d",saved.getId()));
 
+        // Giá khởi tạo là dòng đầu tiên của lịch sử giá
+        audit(AuditAction.PRICE_CHANGE, saved, null, priceSnapshot(saved), "Tạo dịch vụ");
         return ServiceResponse.from(saved);
     }
 
@@ -76,6 +88,8 @@ public class LaundryServiceService {
     public ServiceResponse updateService(Long id, UpdateServiceRequest request) {
         LaundryService service = serviceRepository.findById(id)
                 .orElseThrow(() -> NotFoundException.of("Dịch vụ", id));
+        Map<String, Object> priceBefore = priceSnapshot(service);
+        ServiceStatus statusBefore = service.getStatus();
 
         if (request.name() != null && !request.name().trim().isEmpty()) {
             service.setName(request.name().trim());
@@ -115,6 +129,17 @@ public class LaundryServiceService {
 
         this.serviceRepository.save(service);
 
+        // BR-C02: đổi đơn giá / phụ phí / tối thiểu thì ghi lịch sử giá kèm lý do
+        Map<String, Object> priceAfter = priceSnapshot(service);
+        String reason = request.priceChangeReason() == null || request.priceChangeReason().isBlank()
+                ? null : request.priceChangeReason().trim();
+        if (!priceAfter.equals(priceBefore)) {
+            audit(AuditAction.PRICE_CHANGE, service, priceBefore, priceAfter, reason);
+        }
+        if (service.getStatus() != statusBefore) {
+            audit(AuditAction.SERVICE_STATUS, service, Map.of("status", statusBefore.name()),
+                    Map.of("status", service.getStatus().name()), reason);
+        }
         return ServiceResponse.from(service);
     }
 
@@ -122,11 +147,42 @@ public class LaundryServiceService {
     public ServiceResponse changeStatus(Long id, ServiceStatus status) {
         LaundryService service = serviceRepository.findById(id)
                 .orElseThrow(() -> NotFoundException.of("Dịch vụ", id));
+        ServiceStatus before = service.getStatus();
 
         applyStatus(service, status);
 
         LaundryService saved = serviceRepository.save(service);
+        audit(AuditAction.SERVICE_STATUS, saved, Map.of("status", before.name()),
+                Map.of("status", saved.getStatus().name()), null);
         return ServiceResponse.from(saved);
+    }
+
+    /** Lịch sử giá của dịch vụ (WF-H03), mới nhất trước. */
+    @Transactional(readOnly = true)
+    public List<AuditLogDetailResponse> priceHistory(Long id) {
+        if (!serviceRepository.existsById(id)) throw NotFoundException.of("Dịch vụ", id);
+        return auditLogService.history(EntityType.SERVICE, id, Set.of(AuditAction.PRICE_CHANGE));
+    }
+
+    private void audit(AuditAction action, LaundryService service, Map<String, Object> before,
+                       Map<String, Object> after, String reason) {
+        auditLogService.log(new AuditEntry(action, EntityType.SERVICE, service.getId(), before, after, reason,
+                service.getServiceCode()));
+    }
+
+    /** Các trường ảnh hưởng tới giá; so sánh BigDecimal theo chuỗi rút gọn để 30000 = 30000.00. */
+    private static Map<String, Object> priceSnapshot(LaundryService s) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("currentPrice", plain(s.getCurrentPrice()));
+        data.put("expressSupported", s.getExpressSupported());
+        data.put("expressSurcharge", plain(s.getExpressSurcharge()));
+        data.put("minQuantity", plain(s.getMinQuantity()));
+        data.put("unit", s.getUnit() == null ? null : s.getUnit().name());
+        return data;
+    }
+
+    private static String plain(BigDecimal value) {
+        return value == null ? null : value.stripTrailingZeros().toPlainString();
     }
 
     private void applyStatus(LaundryService service, ServiceStatus status) {

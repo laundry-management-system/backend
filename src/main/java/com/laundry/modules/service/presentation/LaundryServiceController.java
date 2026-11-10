@@ -1,5 +1,6 @@
 package com.laundry.modules.service.presentation;
 
+import com.laundry.modules.log.application.dto.AuditLogDetailResponse;
 import com.laundry.modules.service.application.LaundryServiceService;
 import com.laundry.modules.service.application.dto.ChangeServiceStatusRequest;
 import com.laundry.modules.service.application.dto.CreateServiceRequest;
@@ -58,6 +59,12 @@ public class LaundryServiceController {
     @GetMapping("/{id}")
     public ServiceResponse getServiceById(@PathVariable Long id) {
         return laundryServiceService.getServiceById(id);
+    }
+
+    @Operation(summary = "Price change history of a service (WF-H03 / BR-C02), newest first")
+    @GetMapping("/{id}/price-history")
+    public List<AuditLogDetailResponse> priceHistory(@PathVariable Long id) {
+        return laundryServiceService.priceHistory(id);
     }
 
     @Operation(summary = "Get service details by code (DVxx)")

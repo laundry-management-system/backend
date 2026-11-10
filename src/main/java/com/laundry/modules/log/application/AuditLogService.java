@@ -111,6 +111,26 @@ public class AuditLogService {
         return AuditLogDetailResponse.from(auditLog, user.getFullName(), user.getUsername());
     }
 
+    /** Toàn bộ nhật ký của một đối tượng theo các hành động cho trước, mới nhất trước (ví dụ lịch sử giá dịch vụ). */
+    @Transactional(readOnly = true)
+    public java.util.List<AuditLogDetailResponse> history(com.laundry.modules.log.domain.EntityType entityType,
+                                                          Long entityId,
+                                                          Set<com.laundry.modules.log.domain.AuditAction> actions) {
+        Specification<AuditLog> spec = Specification.allOf(
+                AuditLogSpecs.hasEntityType(entityType),
+                AuditLogSpecs.hasEntityId(entityId),
+                (root, q, cb) -> root.get("action").in(actions));
+        java.util.List<AuditLog> logs = auditLogRepository.findAll(spec,
+                Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id")));
+        Map<Long, User> users = userRepository.findAllById(logs.stream().map(AuditLog::getUserId)
+                        .collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(User::getId, u -> u));
+        return logs.stream().map(a -> {
+            User u = users.get(a.getUserId());
+            return AuditLogDetailResponse.from(a, u == null ? null : u.getFullName(), u == null ? null : u.getUsername());
+        }).toList();
+    }
+
     @Transactional(readOnly = true)
     public Page<AuditLogSummaryResponse> getSummary(AuditLogFilter filter, int page, int size, String direction){
         Sort.Direction dir = "asc".equalsIgnoreCase(direction)

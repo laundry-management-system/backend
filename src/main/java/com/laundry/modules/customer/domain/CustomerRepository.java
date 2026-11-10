@@ -19,11 +19,13 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     boolean existsByPhone(String phone);
 
     @Query("SELECT c FROM Customer c WHERE " +
+            "(:status IS NULL OR c.status = :status) AND " +
             "(:search IS NULL OR :search = '' OR " +
             "LOWER(c.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
             "c.phone LIKE CONCAT('%', :search, '%') OR " +
             "LOWER(c.customerCode) LIKE LOWER(CONCAT('%', :search, '%')))")
-    Page<Customer> searchCustomers(@Param("search") String search, Pageable pageable);
+    Page<Customer> searchCustomers(@Param("search") String search, @Param("status") CustomerStatus status,
+                                   Pageable pageable);
 
     Optional<Customer> findTopByOrderByIdDesc();
 }

@@ -15,8 +15,13 @@ import com.laundry.modules.order.application.dto.OrderResponse;
 import com.laundry.modules.order.application.dto.RescheduleOrderRequest;
 import com.laundry.modules.order.application.dto.RevertStatusRequest;
 import com.laundry.modules.order.application.dto.UpdateOrderItemsRequest;
+import com.laundry.modules.order.application.dto.OrderSearchFilter;
 import com.laundry.modules.order.domain.OrderPriority;
 import com.laundry.modules.order.domain.OrderStatus;
+import com.laundry.modules.order.domain.OrderType;
+import com.laundry.modules.order.domain.PaymentStatus;
+import java.time.Instant;
+import java.util.Map;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -94,7 +99,9 @@ public class OrderController {
         return orderService.addOrderItemImage(orderId, itemId, request);
     }
 
-    @Operation(summary = "Xem danh sách công việc & lọc đơn (UC07 / BM4)")
+    @Operation(summary = "Xem danh sách công việc & lọc đơn (UC07 / BM4)",
+            description = "phone: SĐT khớp chính xác (đơn của một khách); search: tìm gần đúng theo mã đơn, tên, SĐT; "
+                    + "receivedTo là mốc loại trừ; classified=false: đơn chưa phân loại")
     @GetMapping
     public Page<OrderResponse> getOrders(
             @RequestParam(required = false) OrderStatus status,
@@ -102,9 +109,22 @@ public class OrderController {
             @RequestParam(required = false) String phone,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String intakeCode,
+            @RequestParam(required = false) Long customerId,
+            @RequestParam(required = false) Instant receivedFrom,
+            @RequestParam(required = false) Instant receivedTo,
+            @RequestParam(required = false) PaymentStatus paymentStatus,
+            @RequestParam(required = false) OrderType orderType,
+            @RequestParam(required = false) Boolean classified,
             @PageableDefault(size = 20, sort = "dueAt", direction = Sort.Direction.ASC) Pageable pageable
     ) {
-        return orderService.getOrders(status, priority, phone, search, intakeCode, pageable);
+        return orderService.getOrders(new OrderSearchFilter(status, priority, phone, search, intakeCode, customerId,
+                receivedFrom, receivedTo, paymentStatus, orderType, classified), pageable);
+    }
+
+    @Operation(summary = "Đếm đơn theo trạng thái, kèm UNCLASSIFIED (chưa phân loại) và LATE (trễ hẹn)")
+    @GetMapping("/counts")
+    public Map<String, Long> countOrders() {
+        return orderService.countOrders();
     }
 
     @Operation(summary = "Xem chi tiết đầy đủ đơn hàng (BM3, BM5)")

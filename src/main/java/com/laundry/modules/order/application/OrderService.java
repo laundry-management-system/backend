@@ -24,6 +24,9 @@ import com.laundry.modules.order.application.dto.OrderImageDto;
 import com.laundry.modules.order.application.dto.OrderItemDto;
 import com.laundry.modules.order.application.dto.OrderReceiptResponse;
 import com.laundry.modules.order.application.dto.OrderResponse;
+import com.laundry.modules.order.application.dto.OrderSearchFilter;
+import com.laundry.modules.order.domain.OrderSpecs;
+import org.springframework.data.jpa.domain.Specification;
 import com.laundry.modules.order.application.dto.RescheduleOrderRequest;
 import com.laundry.modules.payments.application.PaymentService;
 import com.laundry.modules.order.application.dto.RevertStatusRequest;
@@ -463,12 +466,42 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public Page<OrderResponse> getOrders(OrderStatus status, OrderPriority priority, String phone, String search, String intakeCode, Pageable pageable) {
-        String cleanPhone = (phone != null && !phone.isBlank()) ? phone.trim() : null;
-        String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
-        String cleanIntake = (intakeCode != null && !intakeCode.isBlank()) ? intakeCode.trim() : null;
-        return orderRepository.searchOrders(status, priority, cleanPhone, cleanSearch, cleanIntake, pageable)
-                .map(OrderResponse::from);
+    public Page<OrderResponse> getOrders(OrderSearchFilter f, Pageable pageable) {
+        if (f.receivedFrom() != null && f.receivedTo() != null && !f.receivedTo().isAfter(f.receivedFrom())) {
+            throw new BusinessException("receivedTo phải sau receivedFrom", "receivedTo");
+        }
+        Specification<Order> spec = Specification.allOf(java.util.stream.Stream.of(
+                        OrderSpecs.hasStatus(f.status()),
+                        OrderSpecs.hasPriority(f.priority()),
+                        OrderSpecs.hasPhone(clean(f.phone())),
+                        OrderSpecs.search(clean(f.search())),
+                        OrderSpecs.hasIntakeCode(clean(f.intakeCode())),
+                        OrderSpecs.hasCustomer(f.customerId()),
+                        OrderSpecs.receivedFrom(f.receivedFrom()),
+                        OrderSpecs.receivedBefore(f.receivedTo()),
+                        OrderSpecs.hasPaymentStatus(f.paymentStatus()),
+                        OrderSpecs.hasOrderType(f.orderType()),
+                        OrderSpecs.isClassified(f.classified()))
+                .filter(Objects::nonNull)
+                .toList());
+        return orderRepository.findAll(spec, pageable).map(OrderResponse::from);
+    }
+
+    /** Số đơn theo trạng thái, kèm số đơn chưa phân loại và số đơn trễ hẹn (thanh đếm WF-D01 / B02). */
+    @Transactional(readOnly = true)
+    public Map<String, Long> countOrders() {
+        Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        for (OrderStatus s : OrderStatus.values()) counts.put(s.name(), 0L);
+        for (Object[] row : orderRepository.countByStatus()) {
+            counts.put(((OrderStatus) row[0]).name(), ((Number) row[1]).longValue());
+        }
+        counts.put("UNCLASSIFIED", orderRepository.countUnclassified());
+        counts.put("LATE", orderRepository.countLate(Instant.now()));
+        return counts;
+    }
+
+    private static String clean(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     @Transactional(readOnly = true)
