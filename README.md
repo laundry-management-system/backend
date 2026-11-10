@@ -26,6 +26,13 @@ docker compose up -d
 ---
 
 ### 3. Khởi chạy Ứng dụng Spring Boot
+
+Ứng dụng cần các biến môi trường (JWT, Redis, CORS...). Ở máy local, copy file mẫu rồi sửa giá trị:
+```bash
+cp .env.example .env   # rồi thay JWT_SECRET bằng chuỗi Base64 ngẫu nhiên
+```
+Spring tự đọc file `.env` ở thư mục chạy lệnh (không commit file này). Docker phải chạy cả `laundry-postgres` và `laundry-redis`.
+
 ```bash
 # Windows
 .\mvnw.cmd spring-boot:run
