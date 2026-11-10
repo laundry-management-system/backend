@@ -44,7 +44,10 @@ import com.laundry.modules.order.domain.ServiceType;
 import com.laundry.modules.service.domain.LaundryService;
 import com.laundry.modules.service.domain.LaundryServiceRepository;
 import com.laundry.modules.service.domain.ServiceStatus;
+import com.laundry.modules.order.infrastructure.OrderPaymentLookup;
 import com.laundry.modules.setting.application.SettingService;
+import com.laundry.modules.setting.domain.SettingKey;
+import com.laundry.modules.voucher.application.VoucherService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -78,6 +81,8 @@ public class OrderService {
     private final LaundryServiceRepository laundryServiceRepository;
     private final SettingService settingService;
     private final DocumentService documentService;
+    private final VoucherService voucherService;
+    private final OrderPaymentLookup paymentLookup;
 
     /**
      * Tạo một lượt nhận (1–2 đơn) trong một transaction. Dịch vụ chọn ở quầy chỉ lưu làm tham khảo:
@@ -179,15 +184,25 @@ public class OrderService {
 
     private OrderDetailResponse toDetail(Order order) {
         List<Long> ids = order.getRequestedServiceIds();
-        if (ids == null || ids.isEmpty()) return OrderDetailResponse.from(order, List.of());
-        Map<Long, LaundryService> byId = laundryServiceRepository.findAllById(ids).stream()
-                .collect(Collectors.toMap(LaundryService::getId, Function.identity()));
-        List<RequestedServiceDto> requested = ids.stream().map(id -> {
-            LaundryService svc = byId.get(id);
-            return svc == null ? new RequestedServiceDto(id, null, null)
-                    : new RequestedServiceDto(id, svc.getName(), ItemUnit.valueOf(svc.getUnit().name()));
-        }).toList();
-        return OrderDetailResponse.from(order, requested);
+        List<RequestedServiceDto> requested = List.of();
+        if (ids != null && !ids.isEmpty()) {
+            Map<Long, LaundryService> byId = laundryServiceRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(LaundryService::getId, Function.identity()));
+            requested = ids.stream().map(id -> {
+                LaundryService svc = byId.get(id);
+                return svc == null ? new RequestedServiceDto(id, null, null)
+                        : new RequestedServiceDto(id, svc.getName(), ItemUnit.valueOf(svc.getUnit().name()));
+            }).toList();
+        }
+        return OrderDetailResponse.from(order, requested, extrasOf(order));
+    }
+
+    private OrderDetailResponse.Extras extrasOf(Order order) {
+        String voucherCode = voucherService.findCode(order.getVoucherId()).orElse(null);
+        if (order.getId() == null) return new OrderDetailResponse.Extras(voucherCode, null, null);
+        return paymentLookup.findConfirmed(order.getId())
+                .map(p -> new OrderDetailResponse.Extras(voucherCode, p.method(), p.paidAt()))
+                .orElse(new OrderDetailResponse.Extras(voucherCode, null, null));
     }
 
     @Transactional
@@ -260,7 +275,11 @@ public class OrderService {
     public OrderReceiptResponse getReceipt(Long id, String webBaseUrl) {
         Order order = findOrderById(id);
         order.markReceiptPrinted();
-        if (!order.isIntakeV3()) return OrderReceiptResponse.from(order, webBaseUrl);
+        OrderReceiptResponse.ShopInfo shop = shopInfo();
+        String voucherCode = voucherService.findCode(order.getVoucherId()).orElse(null);
+        if (!order.isIntakeV3()) {
+            return OrderReceiptResponse.from(order, webBaseUrl, 1, 1, order.getWhitesFee(), List.of(), shop, voucherCode);
+        }
 
         List<Order> intake = orderRepository.findByIntakeCode(order.getIntakeCode()).stream()
                 .sorted(Comparator.comparing((Order o) -> o.getOrderType() != OrderType.NORMAL))
@@ -277,7 +296,15 @@ public class OrderService {
         // Chưa phân loại thì phí đồ trắng chưa chốt: in mức hiện hành để tham khảo
         BigDecimal whitesFee = !Boolean.TRUE.equals(order.getWashWhitesSeparately()) ? BigDecimal.ZERO
                 : order.getItems().isEmpty() ? settingService.getWhitesFee() : order.getWhitesFee();
-        return OrderReceiptResponse.from(order, webBaseUrl, Math.max(index, 1), Math.max(intake.size(), 1), whitesFee, lines);
+        return OrderReceiptResponse.from(order, webBaseUrl, Math.max(index, 1), Math.max(intake.size(), 1), whitesFee, lines,
+                shop, voucherCode);
+    }
+
+    private OrderReceiptResponse.ShopInfo shopInfo() {
+        return new OrderReceiptResponse.ShopInfo(
+                settingService.getString(SettingKey.STORE_NAME, "Tiệm giặt ủi"),
+                settingService.getString(SettingKey.STORE_PHONE, null),
+                settingService.getString(SettingKey.STORE_ADDRESS, null));
     }
 
     @Transactional
@@ -362,8 +389,25 @@ public class OrderService {
 
         order.updateItems(items, performedBy);
         order.setWhitesFee(Boolean.TRUE.equals(order.getWashWhitesSeparately()) ? settingService.getWhitesFee() : BigDecimal.ZERO);
-        order.recalcTotals(request.discountAmount());
+        // Tính tiền hàng trước (chưa giảm) để kiểm tra đơn tối thiểu của voucher
+        order.recalcTotals(BigDecimal.ZERO);
+        // Giảm giá chỉ đến từ voucher do BE kiểm tra; discountAmount client gửi bị bỏ qua (vấn đề A)
+        BigDecimal discount = applyVoucher(order, request.voucherCode());
+        order.recalcTotals(discount);
         return toDetail(orderRepository.saveAndFlush(order));
+    }
+
+    /** Áp / đổi / bỏ voucher lúc phân loại; trả số tiền giảm. Lượt dùng được giữ ngay khi áp. */
+    private BigDecimal applyVoucher(Order order, String voucherCode) {
+        Long current = order.getVoucherId();
+        if (voucherCode == null || voucherCode.isBlank()) {
+            voucherService.release(current);
+            order.setVoucherId(null);
+            return BigDecimal.ZERO;
+        }
+        VoucherService.AppliedVoucher applied = voucherService.applyToOrder(voucherCode, order.getSubtotal(), current);
+        order.setVoucherId(applied.voucherId());
+        return applied.discount();
     }
 
     @Transactional
@@ -434,6 +478,12 @@ public class OrderService {
     public OrderDetailResponse adjustPrice(Long id, AdjustPriceRequest request, String performedBy) {
         Order order = findOrderById(id);
         order.adjustPrice(request.newTotalAmount(), request.reason(), performedBy);
+        // Giá Admin nhập là giá cuối: gỡ voucher và trả lượt để hóa đơn / báo cáo không lệch
+        if (order.getVoucherId() != null) {
+            voucherService.release(order.getVoucherId());
+            order.setVoucherId(null);
+            order.setDiscountAmount(BigDecimal.ZERO);
+        }
         return toDetail(order);
     }
 

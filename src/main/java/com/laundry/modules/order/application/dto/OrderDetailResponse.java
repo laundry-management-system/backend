@@ -51,15 +51,32 @@ public record OrderDetailResponse(
         Boolean washWhitesSeparately,
         BigDecimal whitesFee,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        @Schema(description = "Mã voucher đã áp (null nếu không có)")
+        String voucherCode,
+        @Schema(description = "Lần nhắn khách gần nhất")
+        Instant lastNotifiedAt,
+        @Schema(description = "Số lần đã nhắn khách")
+        Integer notifyCount,
+        @Schema(description = "Phương thức của giao dịch thanh toán đang hiệu lực (CASH / BANK_TRANSFER)")
+        String paymentMethod,
+        @Schema(description = "Thời điểm thanh toán của giao dịch đang hiệu lực")
+        Instant paidAt,
+        @Schema(description = "Số lần xử lý (tăng khi mở lần xử lý mới theo phiếu sự cố)")
+        Integer processingCount
 ) {
+    /** Thông tin không nằm trên entity Order: mã voucher và giao dịch thanh toán đang hiệu lực. */
+    public record Extras(String voucherCode, String paymentMethod, Instant paidAt) {
+        public static final Extras NONE = new Extras(null, null, null);
+    }
+
     public static OrderDetailResponse from(Order order) {
         List<RequestedServiceDto> requested = order.getRequestedServiceIds() == null ? List.of()
                 : order.getRequestedServiceIds().stream().map(id -> new RequestedServiceDto(id, null, null)).toList();
-        return from(order, requested);
+        return from(order, requested, Extras.NONE);
     }
 
-    public static OrderDetailResponse from(Order order, List<RequestedServiceDto> requestedServices) {
+    public static OrderDetailResponse from(Order order, List<RequestedServiceDto> requestedServices, Extras extras) {
         List<OrderItemDto> itemDtos = order.getItems() != null
                 ? order.getItems().stream().map(OrderItemDto::from).toList()
                 : List.of();
@@ -106,7 +123,13 @@ public record OrderDetailResponse(
                 order.getWashWhitesSeparately(),
                 order.getWhitesFee(),
                 order.getCreatedAt(),
-                order.getUpdatedAt()
+                order.getUpdatedAt(),
+                extras.voucherCode(),
+                order.getLastNotifiedAt(),
+                order.getNotifyCount(),
+                extras.paymentMethod(),
+                extras.paidAt(),
+                order.getProcessingCount()
         );
     }
 }

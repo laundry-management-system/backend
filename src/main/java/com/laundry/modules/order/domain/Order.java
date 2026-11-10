@@ -172,6 +172,11 @@ public class Order extends BaseEntity {
     @Builder.Default
     private OrderPriority priority = OrderPriority.NORMAL;
 
+    // Lần xử lý (BR-D17): tăng khi phiếu sự cố được duyệt mở lần xử lý mới
+    @Column(name = "processing_count", nullable = false, columnDefinition = "integer default 1")
+    @Builder.Default
+    private Integer processingCount = 1;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();

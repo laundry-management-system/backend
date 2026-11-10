@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -17,8 +18,13 @@ public record UpdateOrderItemsRequest(
         List<OrderItemDto> items,
 
         @DecimalMin(value = "0", message = "Giảm giá không được âm")
-        @Schema(description = "Giảm giá (đơn v3; voucher FE). BE kẹp không vượt tiền hàng")
-        BigDecimal discountAmount
+        @Schema(description = "Không còn dùng: BE bỏ qua, giảm giá chỉ tính từ voucherCode", deprecated = true)
+        @Deprecated
+        BigDecimal discountAmount,
+
+        @Size(max = 30, message = "Mã voucher tối đa 30 ký tự")
+        @Schema(description = "Mã voucher áp cho đơn (đơn v3). Bỏ trống = không dùng voucher; mã cũ được trả lượt", example = "GIAT10")
+        String voucherCode
 ) {
 }
 
