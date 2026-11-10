@@ -908,8 +908,23 @@ pm.test('discountAmount = 0', () => pm.expect(Number(pm.response.json().discount
       body: fixNum(intakeBody('order4')),
       tests: `pm.collectionVariables.set('order4Id', pm.response.json().orders[0].id);`,
     }),
+    req('[GĐ3] Đơn chưa phân loại không được bắt đầu xử lý → 400', 'PATCH', '/api/orders/{{order4Id}}/status', {
+      body: { newStatus: 'PROCESSING' },
+      tests: `
+${status(400)}
+pm.test('Báo chưa phân loại', () => pm.expect(pm.response.json().detail).to.include('chưa phân loại'));`,
+    }),
+    req('[GĐ3] Không dùng API đổi trạng thái để giao đồ → 400', 'PATCH', '/api/orders/{{order4Id}}/status', {
+      body: { newStatus: 'DELIVERED' },
+      tests: status(400),
+    }),
+    req('[GĐ3] ... phân loại đơn 4', 'PUT', '/api/orders/{{order4Id}}/items', {
+      body: fixNum({ items: [{ serviceId: '{{svcKgId}}', itemType: 'Giặt sấy quần áo', quantity: 3 }] }),
+      tests: status(200),
+    }),
     req('[GĐ3] ... chuyển đơn 4 sang Đang xử lý', 'PATCH', '/api/orders/{{order4Id}}/status', {
       body: { newStatus: 'PROCESSING' },
+      tests: status(200),
     }),
     req('[GĐ3] Hủy đơn đang xử lý → 400 (BR-D05)', 'POST', '/api/orders/{{order4Id}}/cancel', {
       body: { reason: 'Thử hủy khi đang xử lý' },

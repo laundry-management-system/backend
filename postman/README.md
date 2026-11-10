@@ -62,7 +62,7 @@ Nhân viên mới phải đặt mật khẩu qua link gửi email. Token của l
 1. Chạy request **01 → Tạo nhân viên mới**. Postman tự lưu `staffUserId` và `staffUsername` vào environment.
 2. Lấy token đặt mật khẩu từ Redis (thay `<id>` bằng `staffUserId`):
    ```bash
-   docker exec laundry-redis redis-cli GET laundry:auth:setup_password:user:<id>
+   docker exec laundry-redis redis-cli -a laundry GET laundry:auth:setup_password:user:<id>
    ```
 3. Dán kết quả vào biến `staffSetupToken` của environment.
 4. Chạy **01 → Đặt mật khẩu nhân viên** (dùng `staffPassword`, mặc định `Staff@123456`), rồi **01 → Đăng nhập nhân viên**.
