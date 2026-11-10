@@ -53,6 +53,7 @@ public class AuditLogService {
                 .action(auditEntry.action())
                 .entityType(auditEntry.entityType())
                 .entityId(auditEntry.entityId())
+                .entityCode(auditEntry.entityCode())
                 .oldData(auditEntry.oldData())
                 .newData(auditEntry.newData())
                 .reason(auditEntry.reason())
@@ -146,7 +147,9 @@ public class AuditLogService {
 
         return result.map(a -> {
             User user = users.get(a.getUserId());
-            return AuditLogSummaryResponse.from(a, user.getFullName(), user.getUsername());
+            return user == null
+                    ? AuditLogSummaryResponse.from(a, null, null, null)
+                    : AuditLogSummaryResponse.from(a, user.getFullName(), user.getUsername(), user.getRole().name());
         });
     }
 }

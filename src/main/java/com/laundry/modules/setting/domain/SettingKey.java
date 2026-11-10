@@ -17,6 +17,8 @@ public enum SettingKey {
     STORAGE_DAYS(SettingType.POSITIVE_INT),
     STORE_NAME(SettingType.STRING),
     STORE_ADDRESS(SettingType.STRING),
+    STORE_PHONE(SettingType.STRING),
+    ORDER_CODE_PREFIX(SettingType.CODE_PREFIX),
     WHITES_FEE(SettingType.NON_NEGATIVE_INT);
 
     private final SettingType type;

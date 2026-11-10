@@ -33,9 +33,18 @@ public record AuditLogSummaryResponse(
         String ipAddress,
 
         @Schema(description = "Thời gian ghi nhật hành động", example = "2026-10-22T04:26:30")
-        Instant createdAt
+        Instant createdAt,
+
+        @Schema(description = "Lý do (nếu có)")
+        String reason,
+
+        @Schema(description = "Vai trò của user tại thời điểm xem", example = "ADMIN")
+        String role,
+
+        @Schema(description = "Mã hiển thị của đối tượng (mã đơn, khóa tham số...)", example = "LD-20261109-001")
+        String entityCode
 ) {
-    public static AuditLogSummaryResponse from(AuditLog auditLog, String fullName, String username){
+    public static AuditLogSummaryResponse from(AuditLog auditLog, String fullName, String username, String role){
         return new AuditLogSummaryResponse(
                 auditLog.getId(),
                 auditLog.getAction(),
@@ -45,7 +54,10 @@ public record AuditLogSummaryResponse(
                 fullName,
                 username,
                 auditLog.getIpAddress(),
-                auditLog.getCreatedAt()
+                auditLog.getCreatedAt(),
+                auditLog.getReason(),
+                role,
+                auditLog.getEntityCode()
         );
     }
 }

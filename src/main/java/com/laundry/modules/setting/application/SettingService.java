@@ -1,11 +1,13 @@
 package com.laundry.modules.setting.application;
 
+import com.laundry.common.exception.BusinessException;
 import com.laundry.common.exception.NotFoundException;
 import com.laundry.common.security.ActorIdResolver;
 import com.laundry.modules.log.application.AuditLogService;
 import com.laundry.modules.log.application.dto.AuditEntry;
 import com.laundry.modules.log.domain.AuditAction;
 import com.laundry.modules.log.domain.EntityType;
+import com.laundry.modules.setting.application.dto.SettingBatchUpdateRequest;
 import com.laundry.modules.setting.application.dto.SettingResponse;
 import com.laundry.modules.setting.application.dto.SettingUpdateRequest;
 import com.laundry.modules.setting.domain.Setting;
@@ -19,8 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -33,18 +37,38 @@ public class SettingService {
 
     @Transactional
     public SettingResponse update(SettingKey settingKey, SettingUpdateRequest request, String username){
+        settingKey.validate(request.value());
+        return SettingResponse.from(apply(settingKey, request.value(), resolver.resolveId(username)));
+    }
 
-        Setting oldD = settingRepository.findById(settingKey)
+    /** Lưu nhiều tham số trong một transaction: một giá trị sai thì không lưu giá trị nào. */
+    @Transactional
+    public List<SettingResponse> updateMany(SettingBatchUpdateRequest request, String username) {
+        Set<SettingKey> seen = new HashSet<>();
+        for (SettingBatchUpdateRequest.Item item : request.items()) {
+            if (!seen.add(item.settingKey())) {
+                throw new BusinessException("Tham số " + item.settingKey() + " bị gửi lặp", "items");
+            }
+            item.settingKey().validate(item.value());
+        }
+        long actorId = resolver.resolveId(username);
+        return request.items().stream()
+                .map(item -> SettingResponse.from(apply(item.settingKey(), item.value(), actorId)))
+                .toList();
+    }
+
+    private Setting apply(SettingKey settingKey, String value, long actorId) {
+        Setting setting = settingRepository.findById(settingKey)
                 .orElseThrow(() -> NotFoundException.of("Tham số", settingKey.name()));
-
-        oldD.getSettingKey().validate(request.value());
+        String normalized = value.trim();
+        if (normalized.equals(setting.getSettingValue())) {
+            return setting;
+        }
         // update() sửa trực tiếp entity nên phải chụp dữ liệu cũ trước, nếu không log cũ = mới
-        Map<String, Object> oldData = toJson(oldD);
-        Setting newD = settingRepository.saveAndFlush(oldD.update(request.value(), resolver.resolveId(username)));
-
-        log(newD, oldData, toJson(newD));
-
-        return SettingResponse.from(newD);
+        Map<String, Object> oldData = toJson(setting);
+        Setting saved = settingRepository.saveAndFlush(setting.update(normalized, actorId));
+        log(saved, oldData, toJson(saved));
+        return saved;
     }
 
     private Map<String, Object> toJson(Setting data){
@@ -63,10 +87,12 @@ public class SettingService {
         auditLogService.log(new AuditEntry(
                 AuditAction.SETTING_UPDATED,
                 EntityType.SETTING,
-                (long) setting.getSettingKey().ordinal(), // Do Setting lưu PK là SettingKey (VARCHAR) nên k thể log entityID là Long như bình thường nên lấy thứ tự của enum thay
+                // PK của Setting là chuỗi: entityId giữ số thứ tự enum cho tương thích log cũ, tra cứu bằng entityCode
+                (long) setting.getSettingKey().ordinal(),
                 oldData,
                 newData,
-                null
+                null,
+                setting.getSettingKey().name()
         ));
     }
 
@@ -89,6 +115,15 @@ public class SettingService {
                             + clazz.getSimpleName());
         }
         return clazz.cast(parsed);
+    }
+
+    /** Giá trị dạng chuỗi; trả {@code fallback} khi chưa cấu hình (dùng cho thông tin hiển thị như tên tiệm). */
+    @Transactional(readOnly = true)
+    public String getString(SettingKey key, String fallback) {
+        return settingRepository.findById(key)
+                .map(Setting::getSettingValue)
+                .filter(v -> !v.isBlank())
+                .orElse(fallback);
     }
 
     @Transactional(readOnly = true)

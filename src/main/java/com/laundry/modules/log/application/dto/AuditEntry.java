@@ -14,6 +14,7 @@ import java.util.Map;
  * @param oldData    dữ liệu trước khi đổi (dev tự chọn các field cần lưu và tạo thành map với key:value = tên biến: giá trị); null nếu là tạo mới
  * @param newData    dữ liệu sau khi đổi (dev tự chọn các field cần lưu và tạo thành map với key:value = tên biến: giá trị); null nếu là xóa
  * @param reason     lý do; bắt buộc với lùi trạng thái, dời hẹn, hủy thanh toán, còn lại có thể null
+ * @param entityCode mã hiển thị của đối tượng (mã đơn, mã voucher, khóa tham số...); có thể null
  */
 public record AuditEntry(
         AuditAction action,
@@ -21,5 +22,11 @@ public record AuditEntry(
         Long entityId,
         Map<String, Object> oldData,
         Map<String, Object> newData,
-        String reason
-) {}
+        String reason,
+        String entityCode
+) {
+    public AuditEntry(AuditAction action, EntityType entityType, Long entityId,
+                      Map<String, Object> oldData, Map<String, Object> newData, String reason) {
+        this(action, entityType, entityId, oldData, newData, reason, null);
+    }
+}

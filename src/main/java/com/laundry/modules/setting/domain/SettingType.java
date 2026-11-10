@@ -35,6 +35,18 @@ public enum SettingType {
         }
     },
 
+    /** Tiền tố mã đơn: 1–2 chữ in hoa hoặc số (cột order_code dài 15: "LD-yyyyMMdd-NNN"). */
+    CODE_PREFIX("1–2 chữ in hoa hoặc số, ví dụ LD") {
+        @Override
+        public Object parse(String raw) {
+            String value = raw.trim();
+            if (!value.matches("[A-Z0-9]{1,2}")) {
+                throw new IllegalArgumentException("Sai định dạng tiền tố");
+            }
+            return value;
+        }
+    },
+
     /** Đúng dạng HH:mm hai chữ số: "08:00" hợp lệ, "8:00" không hợp lệ. */
     TIME("giờ dạng HH:mm, ví dụ 08:00") {
         @Override
