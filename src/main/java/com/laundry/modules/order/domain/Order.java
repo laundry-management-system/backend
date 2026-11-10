@@ -177,6 +177,11 @@ public class Order extends BaseEntity {
     @Builder.Default
     private Integer processingCount = 1;
 
+    // Phần giảm giá do phiếu sự cố (phương án DISCOUNT); nằm trong discountAmount cùng với voucher
+    @Column(name = "incident_discount", nullable = false, precision = 12, scale = 0, columnDefinition = "numeric(12,0) default 0")
+    @Builder.Default
+    private BigDecimal incidentDiscount = BigDecimal.ZERO;
+
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
@@ -207,8 +212,13 @@ public class Order extends BaseEntity {
         return this.intakeCode != null;
     }
 
-    /** Tổng theo QĐ5: Σ thành tiền + phụ phí nhanh + phụ phí đồ trắng − giảm giá (giảm ≤ tiền hàng). */
+    /**
+     * Tổng theo QĐ5: Σ thành tiền + phụ phí nhanh + phụ phí đồ trắng − giảm giá (giảm ≤ tiền hàng).
+     * {@code requestedDiscount} là phần giảm của voucher; phần giảm theo phiếu sự cố được cộng thêm.
+     */
     public void recalcTotals(BigDecimal requestedDiscount) {
+        BigDecimal incident = this.incidentDiscount == null ? BigDecimal.ZERO : this.incidentDiscount;
+        requestedDiscount = (requestedDiscount == null ? BigDecimal.ZERO : requestedDiscount).add(incident);
         BigDecimal sub = BigDecimal.ZERO;
         BigDecimal express = BigDecimal.ZERO;
         for (OrderItem item : this.items) {
@@ -348,6 +358,41 @@ public class Order extends BaseEntity {
         OrderStatus oldStatus = this.status;
         this.status = OrderStatus.CANCELLED;
         addHistory(HistoryActionType.CANCELLED, oldStatus.name(), OrderStatus.CANCELLED.name(), reason, performedBy);
+    }
+
+    /** Phiếu sự cố phương án DISCOUNT được duyệt: trừ vào đơn chưa thanh toán. */
+    public void applyIncidentDiscount(BigDecimal amount, String incidentCode, String performedBy) {
+        if (this.status.isTerminal()) {
+            throw new BusinessException("Đơn đã kết thúc, không giảm giá được");
+        }
+        if (this.paymentStatus == PaymentStatus.PAID) {
+            throw new BusinessException("Đơn đã thanh toán: chọn phương án Bồi thường thay vì Giảm giá");
+        }
+        if (amount == null || amount.signum() <= 0 || amount.compareTo(this.totalAmount) > 0) {
+            throw new BusinessException("Số tiền giảm phải lớn hơn 0 và không vượt tổng tiền đơn ("
+                    + this.totalAmount.toPlainString() + "đ)");
+        }
+        BigDecimal oldTotal = this.totalAmount;
+        this.incidentDiscount = this.incidentDiscount.add(amount);
+        this.discountAmount = (this.discountAmount == null ? BigDecimal.ZERO : this.discountAmount).add(amount);
+        this.totalAmount = this.totalAmount.subtract(amount);
+        addHistory(HistoryActionType.PRICE_ADJUST, oldTotal.toPlainString(), this.totalAmount.toPlainString(),
+                "Giảm giá theo phiếu sự cố " + incidentCode, performedBy);
+    }
+
+    /** Phiếu sự cố phương án REWASH được duyệt: mở lần xử lý mới (BR-D17), đơn quay về Đang xử lý. */
+    public void reopenForIncident(String incidentCode, String redoStage, String performedBy) {
+        if (this.status != OrderStatus.PROCESSING && this.status != OrderStatus.COMPLETED) {
+            throw new BusinessException("Chỉ mở lần xử lý mới cho đơn Đang xử lý hoặc Hoàn thành (chưa giao); đơn đang "
+                    + this.status.getDescription());
+        }
+        OrderStatus oldStatus = this.status;
+        this.status = OrderStatus.PROCESSING;
+        this.completedAt = null;
+        this.processingCount = (this.processingCount == null ? 1 : this.processingCount) + 1;
+        addHistory(HistoryActionType.INCIDENT_REOPEN, oldStatus.name(), OrderStatus.PROCESSING.name(),
+                "Phiếu sự cố " + incidentCode + ": làm lại công đoạn " + redoStage
+                        + " · lần xử lý " + this.processingCount, performedBy);
     }
 
     /** Ghi nhận đã hoàn tiền giao dịch của đơn (khi hủy đơn đã thanh toán). */
