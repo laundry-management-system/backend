@@ -612,6 +612,24 @@ ${status(200)}
 const r = pm.response.json();
 pm.test('ok, giảm 20000', () => { pm.expect(r.ok).to.be.true; pm.expect(Number(r.discount)).to.eql(20000); });`,
   }),
+  req('POST /validate (dạng release/qc)', 'POST', '/api/vouchers/validate', {
+    body: { code: '{{voucherCode}}', orderValue: 200000 },
+    tests: `
+${status(200)}
+const r = pm.response.json();
+pm.test('valid, giảm 20000, còn 180000', () => { pm.expect(r.valid).to.be.true; pm.expect(Number(r.discountAmount)).to.eql(20000); pm.expect(Number(r.finalAmount)).to.eql(180000); });`,
+  }),
+  req('Xem voucher theo mã (NV)', 'GET', '/api/vouchers/by-code/{{voucherCode}}', {
+    auth: 'staff',
+    tests: `
+${status(200)}
+pm.test('remainingUses = 1', () => pm.expect(pm.response.json().remainingUses).to.eql(1));`,
+  }),
+  req('NV tạo voucher → 403', 'POST', '/api/vouchers', {
+    auth: 'staff',
+    body: { code: 'NVTHU', discountType: 'AMOUNT', discountValue: 1000, startDate: '{{today}}', endDate: '2099-12-31', maxUses: 1 },
+    tests: status(403),
+  }),
   req('Kiểm tra mã: dưới tối thiểu → BELOW_MIN', 'GET', '/api/vouchers/check?code={{voucherCode}}&subtotal=50000', {
     tests: `pm.test('BELOW_MIN', () => pm.expect(pm.response.json().reason).to.eql('BELOW_MIN'));`,
   }),
@@ -683,7 +701,7 @@ const f10 = folder('10 - Máy giặt & máy sấy (GĐ2)', 'WF-H04', [
     tests: `
 ${status(201)}
 const m = pm.response.json();
-pm.test('Mã MGxx, READY', () => { pm.expect(m.machineCode).to.match(/^MG\\d{2,}$/); pm.expect(m.status).to.eql('READY'); });
+pm.test('Mã Wxx, READY', () => { pm.expect(m.machineCode).to.match(/^W\\d{2,}$/); pm.expect(m.status).to.eql('READY'); });
 pm.collectionVariables.set('machineId', m.id);`,
   }),
   req('Danh sách máy giặt', 'GET', '/api/machines?type=WASHER', {
@@ -701,19 +719,32 @@ pm.test('Chỉ có máy giặt', () => pm.response.json().forEach(m => pm.expect
 ${status(200)}
 pm.test('MAINTENANCE', () => pm.expect(pm.response.json().status).to.eql('MAINTENANCE'));`,
   }),
-  req('Đổi loại máy khi sửa → 400', 'PUT', '/api/machines/{{machineId}}', {
-    body: { name: 'Đổi loại', type: 'DRYER', capacityKg: 10 },
-    tests: status(400),
+  req('Sửa thông tin máy', 'PUT', '/api/machines/{{machineId}}', {
+    body: { name: 'Máy giặt Postman (sửa)', type: 'WASHER', capacityKg: 12, note: 'Đã sửa' },
+    tests: `
+${status(200)}
+pm.test('Công suất 12', () => pm.expect(Number(pm.response.json().capacityKg)).to.eql(12));`,
   }),
-  req('Ngừng sử dụng', 'PATCH', '/api/machines/{{machineId}}/retire', {
-    body: { reason: 'Postman dọn dẹp' },
+  req('NV cho máy ngừng sử dụng → 403', 'PATCH', '/api/machines/{{machineId}}/status', {
+    auth: 'staff',
+    body: { status: 'RETIRED', reason: 'NV thử' },
+    tests: status(403),
+  }),
+  req('Admin cho máy ngừng sử dụng', 'PATCH', '/api/machines/{{machineId}}/status', {
+    body: { status: 'RETIRED', reason: 'Postman dọn dẹp' },
     tests: `
 ${status(200)}
 pm.test('RETIRED', () => pm.expect(pm.response.json().status).to.eql('RETIRED'));`,
   }),
-  req('Máy đã ngừng không đổi trạng thái được → 400', 'PATCH', '/api/machines/{{machineId}}/status', {
-    body: { status: 'READY' },
+  req('Máy đã ngừng chỉ mở lại về Sẵn sàng → Bảo trì bị từ chối (400)', 'PATCH', '/api/machines/{{machineId}}/status', {
+    body: { status: 'MAINTENANCE', reason: 'Thử' },
     tests: status(400),
+  }),
+  req('Nhật ký có thêm / sửa / đổi trạng thái máy', 'GET', '/api/log?entityType=MACHINE&entityId={{machineId}}', {
+    tests: `
+${status(200)}
+const actions = pm.response.json().content.map(l => l.action);
+pm.test('Có MACHINE_MANAGE và MACHINE_STATUS', () => pm.expect(actions).to.include.members(['MACHINE_MANAGE', 'MACHINE_STATUS']));`,
   }),
   req('NV thêm máy → 403', 'POST', '/api/machines', {
     auth: 'staff',
@@ -820,33 +851,39 @@ pm.test('paymentMethod = CASH, có paidAt', () => { pm.expect(o.paymentMethod).t
 
 // ---------- 12 Reports ----------
 const f12 = folder('12 - Báo cáo & Dashboard (GĐ5)', 'WF-I01, I02, B01', [
-  req('Doanh thu hôm nay theo ngày', 'GET', '/api/reports/revenue?from={{today}}&to={{today}}&groupBy=DAY', {
+  req('Doanh thu hôm nay theo ngày', 'GET', '/api/reports/revenue?from={{today}}&to={{today}}&granularity=DAY', {
     pre: `pm.collectionVariables.set('today', new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10));`,
     tests: `
 ${status(200)}
 const r = pm.response.json();
-pm.test('Có doanh thu (đã thu ở thư mục 05, 11)', () => pm.expect(Number(r.totalRevenue)).to.be.above(0));
-pm.test('Chia theo phương thức', () => pm.expect(r.byMethod.map(m => m.method)).to.include('CASH'));`,
+pm.test('Có doanh thu (đã thu ở thư mục 05, 11)', () => pm.expect(Number(r.summary.total)).to.be.above(0));
+pm.test('Có tiền mặt', () => pm.expect(Number(r.summary.cash)).to.be.above(0));`,
   }),
-  req('Doanh thu theo tháng', 'GET', '/api/reports/revenue?from=2026-01-01&to={{today}}&groupBy=MONTH', {
+  req('Doanh thu theo tháng (điền đủ các tháng)', 'GET', '/api/reports/revenue?from=2026-01-01&to={{today}}&granularity=MONTH', {
     tests: `
 ${status(200)}
-pm.test('Kỳ dạng yyyy-MM', () => pm.response.json().periods.forEach(p => pm.expect(p.period).to.match(/^\\d{4}-\\d{2}$/)));`,
+const rows = pm.response.json().rows;
+pm.test('Kỳ dạng yyyy-MM, bắt đầu từ 2026-01', () => { pm.expect(rows[0].period).to.eql('2026-01'); rows.forEach(p => pm.expect(p.period).to.match(/^\\d{4}-\\d{2}$/)); });`,
   }),
+  req('Granularity sai → 400', 'GET', '/api/reports/revenue?from={{today}}&to={{today}}&granularity=YEAR', { tests: status(400) }),
   req('Khoảng ngày ngược → 400', 'GET', '/api/reports/revenue?from={{today}}&to=2020-01-01', { tests: status(400) }),
   req('Thiếu tham số → 400', 'GET', '/api/reports/revenue', { tests: status(400) }),
   req('Báo cáo đơn hàng & dịch vụ', 'GET', '/api/reports/orders?from={{today}}&to={{today}}', {
     tests: `
 ${status(200)}
 const r = pm.response.json();
-pm.test('Có số đơn và doanh thu dịch vụ', () => { pm.expect(r.totalOrders).to.be.above(0); pm.expect(r.byService).to.be.an('array'); });`,
+pm.test('Có số đơn và doanh thu dịch vụ', () => { pm.expect(r.summary.totalOrders).to.be.above(0); pm.expect(r.byService).to.be.an('array'); });
+pm.test('Có giá trị TB theo loại đơn', () => pm.expect(r.byOrderType.map(t => t.orderType)).to.include('NORMAL'));
+pm.test('Có phụ phí / giảm giá', () => pm.expect(r.surcharges).to.include.keys('expressFee', 'whitesFee', 'discount'));`,
   }),
-  req('Dashboard', 'GET', '/api/dashboard/summary', {
+  req('Dashboard', 'GET', '/api/reports/dashboard', {
     tests: `
 ${status(200)}
-pm.test('Có đơn nhận hôm nay', () => pm.expect(pm.response.json().ordersReceivedToday).to.be.above(0));`,
+const d = pm.response.json();
+pm.test('Có đơn nhận hôm nay', () => pm.expect(d.orders.receivedToday).to.be.above(0));
+pm.test('Có số phiếu sự cố chờ duyệt', () => pm.expect(d.alerts).to.have.property('pendingIncidents'));`,
   }),
-  req('NV xem báo cáo → 403', 'GET', '/api/dashboard/summary', { auth: 'staff', tests: status(403) }),
+  req('NV xem báo cáo → 403', 'GET', '/api/reports/dashboard', { auth: 'staff', tests: status(403) }),
 ])
 
 // ---------- 99 Expected after plan ----------
@@ -946,7 +983,7 @@ pm.test('Có confirmedByName', () => pm.expect(pm.response.json()[0].confirmedBy
       tests: notOk,
     }),
     req('[GĐ4] Danh sách sự cố', 'GET', '/api/incidents', { tests: status(200) }),
-    req('[GĐ5] Dashboard', 'GET', '/api/dashboard/summary', { tests: status(200) }),
+    req('[GĐ5] Dashboard', 'GET', '/api/reports/dashboard', { tests: status(200) }),
     req('[GĐ6] Đếm đơn theo trạng thái', 'GET', '/api/orders/counts', { tests: status(200) }),
     req('[GĐ6] Chi tiết đơn có thông tin thanh toán & nhắc khách', 'GET', '/api/orders/{{orderId}}', {
       tests: `

@@ -10,7 +10,17 @@
 
 ## Tiến độ (cập nhật 2026-11-10)
 
-Đã làm xong GĐ 0 → GĐ 6 trên nhánh `quoc-feature/update`, mỗi giai đoạn một commit. Code **đã biên dịch** nhưng **chưa chạy thử với DB thật** (Docker chưa chạy lúc làm): cần chạy bộ Postman (`postman/`, thư mục 00 → 13) để kiểm tra.
+Đã làm xong GĐ 0 → GĐ 6 trên nhánh `quoc-feature/update` (mỗi giai đoạn một commit), rồi ghép vào `release/qc` trên nhánh `quoc-feature/qc-integration`. Bộ Postman (`postman/`, thư mục 00 → 13) chạy **403/403 assertion đạt** trên bản ghép.
+
+**Ghép với `release/qc`** (nhóm đã có voucher, máy của QuocHuy và báo cáo của PhamTung2006):
+
+| Module | Giữ bản | Bổ sung |
+|---|---|---|
+| Máy | QuocHuy (mã `W01`/`D01`, ngừng sử dụng qua `PATCH /status`, Admin mở lại được) | Bắt buộc lý do khi chuyển Bảo trì; ghi nhật ký khi thêm / sửa |
+| Báo cáo | PhamTung2006 (`/reports/revenue?granularity=`, `/reports/orders`, `/reports/dashboard`) | Giá trị TB theo loại đơn, tổng phụ phí / giảm giá; số phiếu sự cố chờ duyệt trên dashboard |
+| Voucher | Bảng và DTO tạo/sửa của QuocHuy; giữ `GET /by-code`, `POST /validate` | Logic của GĐ 1: nối vào phân loại đơn, giữ lượt atomic, mã lý do khớp FE, ngày theo giờ VN, nhật ký |
+
+Bảng GĐ bên dưới là commit trên `quoc-feature/update`.
 
 | GĐ | Commit | Ghi chú khác với kế hoạch ban đầu |
 |---|---|---|
@@ -277,5 +287,5 @@ Gửi danh sách này cho nhóm FE khi các giai đoạn tương ứng được 
 | 2 | Thêm màn máy giặt/sấy (WF-H04) |
 | 3 | `useCheckout.ts` dùng `POST /orders/{code}/checkout`. Hiện `confirmedByName`. `CancelOrderModal.tsx`: bỏ dòng "Hệ thống chưa tự trả lượt voucher" vì BE đã tự hoàn tiền và trả lượt; chỉ hiện nút Hủy khi đơn Mới nhận. ⚠️ `PATCH /orders/{id}/status` giờ chỉ nhận `PROCESSING` và đơn phải phân loại xong; nút Lùi trạng thái / Sửa giá chỉ Admin gọi được (NV nhận 403). `rules.ts` `adminActionsOf`: tắt Sửa giá khi `paymentStatus = PAID` (BE trả 400 "hủy xác nhận thanh toán trước"). `history.ts`: thêm `INCIDENT_REOPEN` vào `STATUS_ACTIONS` để hiện nhãn trạng thái; `HistoryActionType` thêm `PAYMENT_CONFIRMED`, `PAYMENT_VOIDED`, `INCIDENT_REOPEN` (giao đồ vẫn ghi `STATUS_CHANGE`) |
 | 4 | `OrderIncidentCard.tsx` gọi `GET /orders/{id}/incidents`; thêm màn danh sách và lập/duyệt phiếu (WF-H06, H07) |
-| 5 | Màn báo cáo (WF-I01, I02); dashboard (WF-B01) gọi `/dashboard/summary` |
+| 5 | Màn báo cáo (WF-I01, I02); dashboard (WF-B01) gọi `GET /reports/dashboard` |
 | 6 | `ordersApi.ts`: dùng `GET /orders/counts`. `rules.ts`: dùng cờ `classified`. `customersApi.ts`: lịch sử đơn lọc theo `customerId`; bỏ ghi chú lọc `status`. `CustomersPage.tsx`: hiện thống kê. `ServiceFormModal.tsx`: bỏ ghi chú "BE chưa lưu lịch sử giá". `rules.ts` (auth): có thể bỏ chặn độ dài mật khẩu ở FE. `GET /orders?phone=`: đủ 10 số thì khớp chính xác, ít hơn thì vẫn tìm gần đúng (không phải đổi FE). ⚠️ `PATCH /customers/{id}/status` chỉ Admin: `CustomerDetailPage.tsx` đang hiện nút đổi trạng thái cho cả NV, cần ẩn với NV. Thêm nút reset mật khẩu (`POST /users/{id}/reset-password`) và bật/tắt VIP (`PATCH /customers/{id}/vip`) |

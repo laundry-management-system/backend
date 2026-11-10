@@ -3861,6 +3861,168 @@
           }
         },
         {
+          "name": "POST /validate (dạng release/qc)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('valid, giảm 20000, còn 180000', () => { pm.expect(r.valid).to.be.true; pm.expect(Number(r.discountAmount)).to.eql(20000); pm.expect(Number(r.finalAmount)).to.eql(180000); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/vouchers/validate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vouchers",
+                "validate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{voucherCode}}\",\n  \"orderValue\": 200000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Xem voucher theo mã (NV)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('staffToken')) {",
+                  "  console.log('Bỏ qua: chưa có staffToken (xem README mục Tài khoản STAFF)');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('remainingUses = 1', () => pm.expect(pm.response.json().remainingUses).to.eql(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vouchers/by-code/{{voucherCode}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vouchers",
+                "by-code",
+                "{{voucherCode}}"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "NV tạo voucher → 403",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('staffToken')) {",
+                  "  console.log('Bỏ qua: chưa có staffToken (xem README mục Tài khoản STAFF)');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/vouchers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vouchers"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"NVTHU\",\n  \"discountType\": \"AMOUNT\",\n  \"discountValue\": 1000,\n  \"startDate\": \"{{today}}\",\n  \"endDate\": \"2099-12-31\",\n  \"maxUses\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
           "name": "Kiểm tra mã: dưới tối thiểu → BELOW_MIN",
           "event": [
             {
@@ -4383,7 +4545,7 @@
                 "exec": [
                   "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
                   "const m = pm.response.json();",
-                  "pm.test('Mã MGxx, READY', () => { pm.expect(m.machineCode).to.match(/^MG\\d{2,}$/); pm.expect(m.status).to.eql('READY'); });",
+                  "pm.test('Mã Wxx, READY', () => { pm.expect(m.machineCode).to.match(/^W\\d{2,}$/); pm.expect(m.status).to.eql('READY'); });",
                   "pm.collectionVariables.set('machineId', m.id);"
                 ]
               }
@@ -4543,14 +4705,15 @@
           }
         },
         {
-          "name": "Đổi loại máy khi sửa → 400",
+          "name": "Sửa thông tin máy",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));"
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Công suất 12', () => pm.expect(Number(pm.response.json().capacityKg)).to.eql(12));"
                 ]
               }
             }
@@ -4576,7 +4739,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Đổi loại\",\n  \"type\": \"DRYER\",\n  \"capacityKg\": 10\n}",
+              "raw": "{\n  \"name\": \"Máy giặt Postman (sửa)\",\n  \"type\": \"WASHER\",\n  \"capacityKg\": 12,\n  \"note\": \"Đã sửa\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4586,7 +4749,73 @@
           }
         },
         {
-          "name": "Ngừng sử dụng",
+          "name": "NV cho máy ngừng sử dụng → 403",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('staffToken')) {",
+                  "  console.log('Bỏ qua: chưa có staffToken (xem README mục Tài khoản STAFF)');",
+                  "  pm.execution.skipRequest();",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/machines/{{machineId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "machines",
+                "{{machineId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"RETIRED\",\n  \"reason\": \"NV thử\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{staffToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Admin cho máy ngừng sử dụng",
           "event": [
             {
               "listen": "test",
@@ -4608,7 +4837,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/machines/{{machineId}}/retire",
+              "raw": "{{baseUrl}}/api/machines/{{machineId}}/status",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -4616,12 +4845,12 @@
                 "api",
                 "machines",
                 "{{machineId}}",
-                "retire"
+                "status"
               ]
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"reason\": \"Postman dọn dẹp\"\n}",
+              "raw": "{\n  \"status\": \"RETIRED\",\n  \"reason\": \"Postman dọn dẹp\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4631,7 +4860,7 @@
           }
         },
         {
-          "name": "Máy đã ngừng không đổi trạng thái được → 400",
+          "name": "Máy đã ngừng chỉ mở lại về Sẵn sàng → Bảo trì bị từ chối (400)",
           "event": [
             {
               "listen": "test",
@@ -4665,12 +4894,52 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"status\": \"READY\"\n}",
+              "raw": "{\n  \"status\": \"MAINTENANCE\",\n  \"reason\": \"Thử\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
+            }
+          }
+        },
+        {
+          "name": "Nhật ký có thêm / sửa / đổi trạng thái máy",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const actions = pm.response.json().content.map(l => l.action);",
+                  "pm.test('Có MACHINE_MANAGE và MACHINE_STATUS', () => pm.expect(actions).to.include.members(['MACHINE_MANAGE', 'MACHINE_STATUS']));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/log?entityType=MACHINE&entityId={{machineId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "log"
+              ],
+              "query": [
+                {
+                  "key": "entityType",
+                  "value": "MACHINE"
+                },
+                {
+                  "key": "entityId",
+                  "value": "{{machineId}}"
+                }
+              ]
             }
           }
         },
@@ -5651,8 +5920,8 @@
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
                   "const r = pm.response.json();",
-                  "pm.test('Có doanh thu (đã thu ở thư mục 05, 11)', () => pm.expect(Number(r.totalRevenue)).to.be.above(0));",
-                  "pm.test('Chia theo phương thức', () => pm.expect(r.byMethod.map(m => m.method)).to.include('CASH'));"
+                  "pm.test('Có doanh thu (đã thu ở thư mục 05, 11)', () => pm.expect(Number(r.summary.total)).to.be.above(0));",
+                  "pm.test('Có tiền mặt', () => pm.expect(Number(r.summary.cash)).to.be.above(0));"
                 ]
               }
             }
@@ -5661,7 +5930,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/reports/revenue?from={{today}}&to={{today}}&groupBy=DAY",
+              "raw": "{{baseUrl}}/api/reports/revenue?from={{today}}&to={{today}}&granularity=DAY",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -5680,7 +5949,7 @@
                   "value": "{{today}}"
                 },
                 {
-                  "key": "groupBy",
+                  "key": "granularity",
                   "value": "DAY"
                 }
               ]
@@ -5688,7 +5957,7 @@
           }
         },
         {
-          "name": "Doanh thu theo tháng",
+          "name": "Doanh thu theo tháng (điền đủ các tháng)",
           "event": [
             {
               "listen": "test",
@@ -5696,7 +5965,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Kỳ dạng yyyy-MM', () => pm.response.json().periods.forEach(p => pm.expect(p.period).to.match(/^\\d{4}-\\d{2}$/)));"
+                  "const rows = pm.response.json().rows;",
+                  "pm.test('Kỳ dạng yyyy-MM, bắt đầu từ 2026-01', () => { pm.expect(rows[0].period).to.eql('2026-01'); rows.forEach(p => pm.expect(p.period).to.match(/^\\d{4}-\\d{2}$/)); });"
                 ]
               }
             }
@@ -5705,7 +5975,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/reports/revenue?from=2026-01-01&to={{today}}&groupBy=MONTH",
+              "raw": "{{baseUrl}}/api/reports/revenue?from=2026-01-01&to={{today}}&granularity=MONTH",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -5724,8 +5994,51 @@
                   "value": "{{today}}"
                 },
                 {
-                  "key": "groupBy",
+                  "key": "granularity",
                   "value": "MONTH"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Granularity sai → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/revenue?from={{today}}&to={{today}}&granularity=YEAR",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "reports",
+                "revenue"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "{{today}}"
+                },
+                {
+                  "key": "to",
+                  "value": "{{today}}"
+                },
+                {
+                  "key": "granularity",
+                  "value": "YEAR"
                 }
               ]
             }
@@ -5809,7 +6122,9 @@
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
                   "const r = pm.response.json();",
-                  "pm.test('Có số đơn và doanh thu dịch vụ', () => { pm.expect(r.totalOrders).to.be.above(0); pm.expect(r.byService).to.be.an('array'); });"
+                  "pm.test('Có số đơn và doanh thu dịch vụ', () => { pm.expect(r.summary.totalOrders).to.be.above(0); pm.expect(r.byService).to.be.an('array'); });",
+                  "pm.test('Có giá trị TB theo loại đơn', () => pm.expect(r.byOrderType.map(t => t.orderType)).to.include('NORMAL'));",
+                  "pm.test('Có phụ phí / giảm giá', () => pm.expect(r.surcharges).to.include.keys('expressFee', 'whitesFee', 'discount'));"
                 ]
               }
             }
@@ -5849,7 +6164,9 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Có đơn nhận hôm nay', () => pm.expect(pm.response.json().ordersReceivedToday).to.be.above(0));"
+                  "const d = pm.response.json();",
+                  "pm.test('Có đơn nhận hôm nay', () => pm.expect(d.orders.receivedToday).to.be.above(0));",
+                  "pm.test('Có số phiếu sự cố chờ duyệt', () => pm.expect(d.alerts).to.have.property('pendingIncidents'));"
                 ]
               }
             }
@@ -5858,14 +6175,14 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/dashboard/summary",
+              "raw": "{{baseUrl}}/api/reports/dashboard",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
-                "dashboard",
-                "summary"
+                "reports",
+                "dashboard"
               ]
             }
           }
@@ -5899,14 +6216,14 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/dashboard/summary",
+              "raw": "{{baseUrl}}/api/reports/dashboard",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
-                "dashboard",
-                "summary"
+                "reports",
+                "dashboard"
               ]
             },
             "auth": {
@@ -6870,14 +7187,14 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/dashboard/summary",
+              "raw": "{{baseUrl}}/api/reports/dashboard",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
-                "dashboard",
-                "summary"
+                "reports",
+                "dashboard"
               ]
             }
           }
