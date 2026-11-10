@@ -8,6 +8,22 @@
 > Các đường dẫn BE bên dưới tính từ `src/main/java/com/laundry/modules/`.
 > Cỡ việc: **S** ≈ vài giờ · **M** ≈ 1–2 ngày · **L** ≈ 3–5 ngày.
 
+## Tiến độ (cập nhật 2026-11-10)
+
+Đã làm xong GĐ 0 → GĐ 6 trên nhánh `quoc-feature/update`, mỗi giai đoạn một commit. Code **đã biên dịch** nhưng **chưa chạy thử với DB thật** (Docker chưa chạy lúc làm): cần chạy bộ Postman (`postman/`, thư mục 00 → 13) để kiểm tra.
+
+| GĐ | Commit | Ghi chú khác với kế hoạch ban đầu |
+|---|---|---|
+| 0 | `64a7a77` | Tiền tố mã đơn chỉ 1–2 ký tự (cột `order_code` dài 15). Thêm `SchemaCompatibilityRunner`: gỡ ràng buộc CHECK cũ của cột enum và nạp 2 tham số mới khi khởi động |
+| 1 | `6513c9c` | Làm luôn các field WF-D02 của chi tiết đơn và tên tiệm / hotline trên phiếu (WF-K02) |
+| 2 | `34bc36c` | — |
+| 3 | `9d78f80` | Thêm: `PATCH /orders/{id}/status` chỉ còn cho Mới nhận → Đang xử lý (trước đây đi tắt được tới Đã giao / Đã hủy); lùi trạng thái chỉ về bước trước; chặn sửa giá đơn đã thanh toán |
+| 4 | `fc6bd61` | Đơn có thêm cột `incident_discount` để phân loại lại không làm mất giảm giá của phiếu sự cố |
+| 5 | `0e72916` | — |
+| 6 | `69eb4a7` | Lịch sử đơn của khách dùng `GET /orders?customerId=` (không làm `GET /customers/{id}/orders` riêng). Thêm xử lý lỗi 400/404/405/409 |
+
+> ⚠️ **Môi trường dùng migration riêng** (không dùng `ddl-auto`): cần thêm bảng `vouchers`, `machines`, `incidents`; cột `audit_logs.entity_code`, `orders.processing_count`, `orders.incident_discount`; gỡ các ràng buộc CHECK liệt kê trong `common/config/SchemaCompatibilityRunner.java`.
+
 ---
 
 ## 1. Đối chiếu BE.md với code hiện tại
@@ -243,10 +259,10 @@ Repo hiện **chưa có `src/test`**. Đề xuất:
 
 ## 5. Cần nhóm chốt trước khi code
 
-- [ ] **Voucher và sửa giá (vấn đề D):** khi Admin `adjustPrice`, giữ voucher hay bỏ voucher và trả lượt? *Đề xuất: bỏ voucher, trả lượt.*
-- [ ] **Thời điểm tính lượt voucher:** giữ lượt ngay khi phân loại hay chỉ trừ khi thanh toán? *Đề xuất: ngay khi phân loại.*
-- [ ] **Phương án DISCOUNT của sự cố:** tự trừ vào tổng tiền đơn chưa thanh toán, hay chỉ ghi nhận số tiền? *Đề xuất: tự trừ (cộng vào `discountAmount`), chỉ cho chọn khi đơn chưa thanh toán.*
-- [ ] **Lượt chạy máy (BR-E03→E09):** có nằm trong phạm vi đợt này không? *Đề xuất: chưa làm, FE chưa có màn.*
+- [x] **Voucher và sửa giá (vấn đề D):** → **Đã chốt: bỏ voucher, trả lượt.**
+- [x] **Thời điểm tính lượt voucher:** → **Đã chốt: giữ lượt ngay khi phân loại.**
+- [x] **Phương án DISCOUNT của sự cố:** → **Đã chốt: tự trừ vào đơn, chỉ khi đơn chưa thanh toán.**
+- [x] **Lượt chạy máy (BR-E03→E09):** → **Đã chốt: chưa làm đợt này.**
 - [x] ~~**Endpoint cũ `POST /orders/quick-create`**~~ → **Đã chốt: xóa.** FE không gọi (đã kiểm tra). Xem GĐ 3.4.
 - [ ] **Refresh token nhiều tab (BE-6):** có cần cho phép token cũ dùng lại trong vài giây sau khi xoay vòng không? *Đề xuất: để sau, FE đã xử lý tạm trong một tab.*
 
@@ -259,7 +275,7 @@ Gửi danh sách này cho nhóm FE khi các giai đoạn tương ứng được 
 | 0 | `constants.ts`: đọc `OPENING_TIME`/`CLOSING_TIME` từ `GET /settings`. `useShopInfo.ts`: lấy tên tiệm, địa chỉ, hotline từ `GET /settings` thay vì gọi API in phiếu. Trang Cài đặt thêm `STORE_PHONE`, `ORDER_CODE_PREFIX`; có thể lưu nhiều tham số một lần bằng `PATCH /settings`. Nhật ký hiển thị thêm `reason`, `role`, `entityCode` |
 | 1 | ⚠️ **Bắt buộc:** `ordersApi.updateItems` gửi `voucherCode` thay cho `discountAmount`. `voucherCheck.ts` gọi `GET /vouchers/check`, xóa `voucherMock.ts`. Thêm màn quản lý voucher (WF-H05) |
 | 2 | Thêm màn máy giặt/sấy (WF-H04) |
-| 3 | `useCheckout.ts` dùng `POST /orders/{code}/checkout`. Hiện `confirmedByName`. `CancelOrderModal.tsx`: bỏ dòng "Hệ thống chưa tự trả lượt voucher" vì BE đã tự hoàn tiền và trả lượt |
+| 3 | `useCheckout.ts` dùng `POST /orders/{code}/checkout`. Hiện `confirmedByName`. `CancelOrderModal.tsx`: bỏ dòng "Hệ thống chưa tự trả lượt voucher" vì BE đã tự hoàn tiền và trả lượt; chỉ hiện nút Hủy khi đơn Mới nhận. ⚠️ `PATCH /orders/{id}/status` giờ chỉ nhận `PROCESSING` và đơn phải phân loại xong; nút Lùi trạng thái / Sửa giá chỉ Admin gọi được (NV nhận 403) |
 | 4 | `OrderIncidentCard.tsx` gọi `GET /orders/{id}/incidents`; thêm màn danh sách và lập/duyệt phiếu (WF-H06, H07) |
 | 5 | Màn báo cáo (WF-I01, I02); dashboard (WF-B01) gọi `/dashboard/summary` |
-| 6 | `ordersApi.ts`: dùng `GET /orders/counts`. `rules.ts`: dùng cờ `classified`. `customersApi.ts`: lịch sử đơn lọc theo `customerId`; bỏ ghi chú lọc `status`. `CustomersPage.tsx`: hiện thống kê. `ServiceFormModal.tsx`: bỏ ghi chú "BE chưa lưu lịch sử giá". `rules.ts` (auth): có thể bỏ chặn độ dài mật khẩu ở FE |
+| 6 | `ordersApi.ts`: dùng `GET /orders/counts`. `rules.ts`: dùng cờ `classified`. `customersApi.ts`: lịch sử đơn lọc theo `customerId`; bỏ ghi chú lọc `status`. `CustomersPage.tsx`: hiện thống kê. `ServiceFormModal.tsx`: bỏ ghi chú "BE chưa lưu lịch sử giá". `rules.ts` (auth): có thể bỏ chặn độ dài mật khẩu ở FE. ⚠️ `GET /orders?phone=` giờ so khớp chính xác (tìm gần đúng dùng `search`). `PATCH /customers/{id}/status` chỉ Admin. Thêm nút reset mật khẩu (`POST /users/{id}/reset-password`) và bật/tắt VIP (`PATCH /customers/{id}/vip`) |

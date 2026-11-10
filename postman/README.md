@@ -1,11 +1,12 @@
 # Kiểm thử API bằng Postman
 
-Bộ kiểm thử cho backend Laundry, gồm khoảng 100 request có sẵn assert.
+Bộ kiểm thử cho backend Laundry, gồm khoảng 155 request có sẵn assert.
 
 | File | Nội dung |
 |---|---|
 | `laundry.postman_collection.json` | Collection: các request chia theo thư mục, mỗi request có test |
 | `local.postman_environment.json` | Environment cho máy local (`http://localhost:8080`) |
+| `build-collection.mjs` | Script sinh 2 file trên (xem mục 7) |
 
 ## 1. Chuẩn bị
 
@@ -26,7 +27,7 @@ Redis bắt buộc phải chạy (đăng nhập dùng Redis để đếm số l�
 
 ## 3. Chạy
 
-- **Chạy cả bộ:** chuột phải collection → **Run collection** → bỏ chọn thư mục `99` → **Run**.
+- **Chạy cả bộ:** chuột phải collection → **Run collection** → **Run**.
 - **Chạy từng request:** luôn chạy `00 - Đăng nhập Admin` trước để có token.
 
 Các thư mục phụ thuộc nhau theo thứ tự (03 lấy id dịch vụ, 04 tạo khách, 05–06 dùng khách đó để tạo đơn...). Khi chạy lẻ một thư mục, hãy chạy các thư mục trước nó ít nhất một lần.
@@ -42,11 +43,17 @@ Các thư mục phụ thuộc nhau theo thứ tự (03 lấy id dịch vụ, 04 
 | 06 | Thao tác Admin: dời hẹn, sửa giá, lùi trạng thái, hủy thanh toán, ghi chênh lệch, hủy đơn |
 | 07 | Đồ tồn, nhật ký hệ thống |
 | 08 | Phân quyền: NV gọi API của Admin phải bị 403 (cần tài khoản STAFF) |
-| **99** | **Test cho tính năng chưa làm theo `plan.md`. Hiện FAIL là bình thường** |
+| 09 | Voucher: tạo, kiểm tra mã, áp vào đơn, hết lượt, hủy đơn trả lượt |
+| 10 | Máy giặt & máy sấy: thêm, bảo trì, ngừng sử dụng |
+| 11 | Phiếu sự cố (giặt lại, giảm giá, bồi thường, từ chối) và Thanh toán–giao một lần (checkout) |
+| 12 | Báo cáo doanh thu, báo cáo đơn hàng & dịch vụ, dashboard |
+| 13 | Hồi quy các lỗi đã sửa theo `plan.md` (tên test ghi giai đoạn, ví dụ `[GĐ3]`) |
 
 Mỗi request đều có test chung **"Không lỗi 500"**. Khi API trả lỗi 4xx, nội dung lỗi (`detail`, `errors`) được in ra **Console** của Postman để dễ dò.
 
-**Dữ liệu sinh ra:** mỗi lần chạy sẽ tạo 1 khách hàng mới (SĐT ngẫu nhiên đầu `08`), 1 dịch vụ thử (đã tắt ở cuối thư mục 03) và 2–4 đơn hàng. Chỉ nên chạy trên DB dev.
+**Dữ liệu sinh ra:** mỗi lần chạy sẽ tạo 1 khách hàng mới (SĐT ngẫu nhiên đầu `08`), 1 dịch vụ thử (đã tắt), 1 voucher (đã tắt), 1 máy (đã ngừng sử dụng), khoảng 6 đơn hàng và 3 phiếu sự cố. Chỉ nên chạy trên DB dev.
+
+**Lưu ý:** test "Bồi thường vượt mức" dựa vào tham số `COMPENSATION_TERMS` là một con số (mặc định `100000`). Nếu đổi tham số này thành văn bản thì BE không áp mức trần và test đó sẽ FAIL.
 
 ## 4. Tài khoản STAFF (để chạy thư mục 08)
 
@@ -62,27 +69,22 @@ Nhân viên mới phải đặt mật khẩu qua link gửi email. Token của l
 
 Chỉ cần làm một lần. Những lần sau, request tạo nhân viên tự bỏ qua vì `staffUsername` đã có. Nếu chưa có `staffToken`, các request dùng tài khoản STAFF sẽ tự động bị bỏ qua (skip), không bị tính là FAIL.
 
-## 5. Thư mục 99: kiểm thử theo plan.md
-
-Mỗi test có tiền tố giai đoạn, ví dụ `[GĐ1] Kiểm tra mã voucher`. Các test này mô tả hành vi **sau khi** làm xong giai đoạn đó, nên hiện tại FAIL.
-
-Cách dùng: khi làm xong một giai đoạn, chạy các test có tiền tố tương ứng. Tất cả PASS nghĩa là giai đoạn đã đúng yêu cầu. Sau đó có thể chuyển các test đó sang thư mục chính.
-
-## 6. Chạy bằng dòng lệnh (Newman)
+## 5. Chạy bằng dòng lệnh (Newman)
 
 ```bash
 npx newman run postman/laundry.postman_collection.json \
   -e postman/local.postman_environment.json \
-  --env-var adminPassword=<mật khẩu admin> \
-  --folder "00 - Khởi động & Đăng nhập" \
-  --folder "02 - Cài đặt" --folder "03 - Dịch vụ & bảng giá" --folder "04 - Khách hàng" \
-  --folder "05 - Luồng đơn chuẩn: nhận → phân loại → xử lý → thanh toán → giao" \
-  --folder "06 - Thao tác Admin: dời hẹn, sửa giá, lùi trạng thái, hủy thanh toán, hủy đơn" \
-  --folder "07 - Đồ tồn & Nhật ký hệ thống"
+  --env-var adminPassword=<mật khẩu admin>
 ```
 
-## 7. Cập nhật collection
+## 6. Cập nhật collection
 
-Khi BE thêm API mới, có thể thêm request trực tiếp trong Postman rồi **Export** (Collection v2.1) đè lên file `laundry.postman_collection.json` và commit.
+Collection được sinh từ `build-collection.mjs`. Thêm hoặc sửa request trong script rồi chạy (từ thư mục `backend`):
+
+```bash
+node postman/build-collection.mjs postman
+```
+
+Cũng có thể sửa trực tiếp trong Postman rồi **Export** (Collection v2.1) đè lên file JSON, nhưng khi đó script sẽ không còn khớp với file.
 
 Ngoài ra, danh sách đầy đủ mọi endpoint luôn có ở Swagger UI: `http://localhost:8080/swagger-ui.html`. Có thể import link `http://localhost:8080/v3/api-docs` vào Postman để có collection tự sinh (không kèm test).
