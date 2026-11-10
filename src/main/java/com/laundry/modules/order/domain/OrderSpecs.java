@@ -18,9 +18,16 @@ public final class OrderSpecs {
         return priority == null ? null : (root, q, cb) -> cb.equal(root.get("priority"), priority);
     }
 
-    /** So khớp chính xác: dùng để lấy đơn của đúng một khách. Tìm gần đúng theo SĐT dùng {@link #search}. */
+    /**
+     * FE dùng {@code phone} cho hai việc: đủ 10 số (hồ sơ khách) thì so khớp chính xác để không lẫn đơn của
+     * khách khác; ít số hơn (ô tìm kiếm danh sách đơn) thì tìm gần đúng như trước.
+     */
     public static Specification<Order> hasPhone(String phone) {
-        return phone == null ? null : (root, q, cb) -> cb.equal(root.get("customerPhone"), phone);
+        if (phone == null) return null;
+        String digits = phone.replaceAll("[\\s.-]", "");
+        return digits.matches("0\\d{9}")
+                ? (root, q, cb) -> cb.equal(root.get("customerPhone"), digits)
+                : (root, q, cb) -> cb.like(root.get("customerPhone"), "%" + digits + "%");
     }
 
     public static Specification<Order> hasCustomer(Long customerId) {

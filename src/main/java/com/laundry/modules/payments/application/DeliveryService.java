@@ -41,7 +41,8 @@ public class DeliveryService {
                 .orElseThrow(() -> new BusinessException("Đơn đang ở trạng thái đã thanh toán nhưng thiếu giao dịch"));
         Instant deliveredAt = Instant.now();
         orderIntegration.deliver(order.id(), deliveredAt, username, receiver.name(), receiver.relation());
-        orderIntegration.appendHistory(order.id(), "DELIVERED", "COMPLETED", "DELIVERED",
+        // STATUS_CHANGE (không dùng DELIVERED) để FE hiển thị "Hoàn thành → Đã giao" như các bước đổi trạng thái khác
+        orderIntegration.appendHistory(order.id(), "STATUS_CHANGE", "COMPLETED", "DELIVERED",
                 receiver.name() != null
                         ? "Giao cho người nhận hộ: " + receiver.name() + " (" + receiver.relation() + ")"
                         : "Giao đồ trực tiếp cho khách hàng",

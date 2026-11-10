@@ -6733,8 +6733,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const types = pm.response.json().historyList.map(h => h.actionType);",
-                  "pm.test('Có PAYMENT_CONFIRMED và DELIVERED', () => pm.expect(types).to.include.members(['PAYMENT_CONFIRMED', 'DELIVERED']));"
+                  "const list = pm.response.json().historyList;",
+                  "pm.test('Có PAYMENT_CONFIRMED', () => pm.expect(list.map(h => h.actionType)).to.include('PAYMENT_CONFIRMED'));",
+                  "pm.test('Giao đồ ghi STATUS_CHANGE → DELIVERED (FE hiển thị nhãn trạng thái)', () =>",
+                  "  pm.expect(list.some(h => h.actionType === 'STATUS_CHANGE' && h.newValue === 'DELIVERED')).to.be.true);"
                 ]
               }
             }
@@ -6939,14 +6941,16 @@
           }
         },
         {
-          "name": "[GĐ6] Lọc đơn theo SĐT là khớp chính xác",
+          "name": "[GĐ6] SĐT đủ 10 số → chỉ đơn của đúng khách đó",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Không trả đơn khi SĐT chỉ khớp một phần', () => pm.expect(pm.response.json().totalElements).to.eql(0));"
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const phone = pm.collectionVariables.get('customerPhone');",
+                  "pm.test('Mọi đơn đều đúng SĐT', () => pm.response.json().content.forEach(o => pm.expect(o.customerPhone).to.eql(phone)));"
                 ]
               }
             }
@@ -6955,7 +6959,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/orders?phone=08",
+              "raw": "{{baseUrl}}/api/orders?phone={{customerPhone}}&size=100",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -6966,7 +6970,95 @@
               "query": [
                 {
                   "key": "phone",
-                  "value": "08"
+                  "value": "{{customerPhone}}"
+                },
+                {
+                  "key": "size",
+                  "value": "100"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "[GĐ6] SĐT một phần → tìm gần đúng (ô tìm kiếm danh sách đơn của FE)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set('phoneTail', pm.collectionVariables.get('customerPhone').slice(-6));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Tìm thấy ít nhất 1 đơn', () => pm.expect(pm.response.json().totalElements).to.be.at.least(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?phone={{phoneTail}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "phone",
+                  "value": "{{phoneTail}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "[GĐ6] Lọc đơn theo customerId",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const id = Number(pm.collectionVariables.get('customerId'));",
+                  "pm.test('Mọi đơn thuộc khách', () => pm.response.json().content.forEach(o => pm.expect(o.customerId).to.eql(id)));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?customerId={{customerId}}&size=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "customerId",
+                  "value": "{{customerId}}"
+                },
+                {
+                  "key": "size",
+                  "value": "100"
                 }
               ]
             }

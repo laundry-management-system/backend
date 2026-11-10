@@ -100,7 +100,8 @@ public class OrderController {
     }
 
     @Operation(summary = "Xem danh sách công việc & lọc đơn (UC07 / BM4)",
-            description = "phone: SĐT khớp chính xác (đơn của một khách); search: tìm gần đúng theo mã đơn, tên, SĐT; "
+            description = "phone: đủ 10 số thì khớp chính xác (đơn của một khách), ít hơn thì tìm gần đúng; "
+                    + "search: tìm gần đúng theo mã đơn, tên, SĐT; "
                     + "receivedTo là mốc loại trừ; classified=false: đơn chưa phân loại")
     @GetMapping
     public Page<OrderResponse> getOrders(

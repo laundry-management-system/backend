@@ -932,8 +932,10 @@ pm.test('Báo chưa phân loại', () => pm.expect(pm.response.json().detail).to
     }),
     req('[GĐ3] Thanh toán ghi lịch sử đơn', 'GET', '/api/orders/{{orderId}}', {
       tests: `
-const types = pm.response.json().historyList.map(h => h.actionType);
-pm.test('Có PAYMENT_CONFIRMED và DELIVERED', () => pm.expect(types).to.include.members(['PAYMENT_CONFIRMED', 'DELIVERED']));`,
+const list = pm.response.json().historyList;
+pm.test('Có PAYMENT_CONFIRMED', () => pm.expect(list.map(h => h.actionType)).to.include('PAYMENT_CONFIRMED'));
+pm.test('Giao đồ ghi STATUS_CHANGE → DELIVERED (FE hiển thị nhãn trạng thái)', () =>
+  pm.expect(list.some(h => h.actionType === 'STATUS_CHANGE' && h.newValue === 'DELIVERED')).to.be.true);`,
     }),
     req('[GĐ3] PaymentResponse có tên người xác nhận', 'GET', '/api/orders/{{orderCode}}/payments', {
       tests: `
@@ -950,9 +952,23 @@ pm.test('Có confirmedByName', () => pm.expect(pm.response.json()[0].confirmedBy
       tests: `
 pm.test('Có field mới', () => pm.expect(pm.response.json()).to.include.keys('lastNotifiedAt', 'notifyCount', 'paymentMethod', 'paidAt', 'voucherCode'));`,
     }),
-    req('[GĐ6] Lọc đơn theo SĐT là khớp chính xác', 'GET', '/api/orders?phone=08', {
+    req('[GĐ6] SĐT đủ 10 số → chỉ đơn của đúng khách đó', 'GET', '/api/orders?phone={{customerPhone}}&size=100', {
       tests: `
-pm.test('Không trả đơn khi SĐT chỉ khớp một phần', () => pm.expect(pm.response.json().totalElements).to.eql(0));`,
+${status(200)}
+const phone = pm.collectionVariables.get('customerPhone');
+pm.test('Mọi đơn đều đúng SĐT', () => pm.response.json().content.forEach(o => pm.expect(o.customerPhone).to.eql(phone)));`,
+    }),
+    req('[GĐ6] SĐT một phần → tìm gần đúng (ô tìm kiếm danh sách đơn của FE)', 'GET', '/api/orders?phone={{phoneTail}}', {
+      pre: `pm.variables.set('phoneTail', pm.collectionVariables.get('customerPhone').slice(-6));`,
+      tests: `
+${status(200)}
+pm.test('Tìm thấy ít nhất 1 đơn', () => pm.expect(pm.response.json().totalElements).to.be.at.least(1));`,
+    }),
+    req('[GĐ6] Lọc đơn theo customerId', 'GET', '/api/orders?customerId={{customerId}}&size=100', {
+      tests: `
+${status(200)}
+const id = Number(pm.collectionVariables.get('customerId'));
+pm.test('Mọi đơn thuộc khách', () => pm.response.json().content.forEach(o => pm.expect(o.customerId).to.eql(id)));`,
     }),
     req('[GĐ6] Lọc khách theo trạng thái', 'GET', '/api/customers?status=INACTIVE&size=50', {
       tests: `
