@@ -132,6 +132,26 @@ public class JpaOrderIntegrationAdapter implements OrderIntegration {
     }
 
     @Override
+    @Transactional
+    public void appendHistory(long orderId, String actionType, String oldValue, String newValue, String reason,
+                              String performedBy) {
+        entityManager.createNativeQuery("""
+                        INSERT INTO order_status_history
+                            (order_id, action_type, old_value, new_value, reason, performed_by, created_at, updated_at)
+                        VALUES
+                            (:orderId, :actionType, :oldValue, :newValue, :reason, :performedBy,
+                             CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                        """)
+                .setParameter("orderId", orderId)
+                .setParameter("actionType", actionType)
+                .setParameter("oldValue", oldValue)
+                .setParameter("newValue", newValue)
+                .setParameter("reason", reason)
+                .setParameter("performedBy", performedBy == null ? "SYSTEM" : performedBy)
+                .executeUpdate();
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public List<OrderSnapshot> findOverdue(Instant completedBefore) {
         Query query = entityManager.createNativeQuery(ORDER_SELECT + """

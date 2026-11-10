@@ -6,7 +6,6 @@ import com.laundry.modules.payments.application.dto.PaymentResponse;
 import com.laundry.modules.payments.application.dto.ResolvePaymentRequest;
 import com.laundry.modules.payments.application.dto.VietQrResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/orders/{orderCode}/payments")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN', 'STAFF', 'EMPLOYEE')")
+@PreAuthorize("hasAnyRole('ADMIN', 'STAFF')")
 public class PaymentController {
 
     private final PaymentService paymentService;
@@ -50,9 +49,8 @@ public class PaymentController {
     public PaymentResponse resolve(@PathVariable String orderCode,
                                    @PathVariable long paymentId,
                                    @Valid @RequestBody ResolvePaymentRequest request,
-                                   Authentication authentication,
-                                   HttpServletRequest httpRequest) {
-        return paymentService.resolve(orderCode, paymentId, request, authentication.getName(),
-                httpRequest.getRemoteAddr());
+                                   Authentication authentication) {
+        // IP người thao tác do AuditLogService tự lấy từ request
+        return paymentService.resolve(orderCode, paymentId, request, authentication.getName());
     }
 }

@@ -33,6 +33,59 @@ public class ReportQueryRepository {
                                        long waiting, long processing, long readyForPickup,
                                        long lateOrders, long storedOrders) {}
 
+    public record OrderTypeRecord(String orderType, long orderCount, BigDecimal totalAmount, BigDecimal averageAmount) {}
+
+    public record SurchargeTotals(BigDecimal expressFee, BigDecimal whitesFee, BigDecimal discount) {}
+
+    /** Số đơn, tổng và trung bình tổng tiền theo loại đơn (Tiêu chuẩn / Giặt nhanh), không tính đơn hủy. */
+    public List<OrderTypeRecord> sumOrdersByType(Instant from, Instant to) {
+        String sql = """
+                SELECT o.order_type AS order_type,
+                       COUNT(*) AS order_count,
+                       COALESCE(SUM(o.total_amount), 0) AS total_amount,
+                       COALESCE(ROUND(AVG(o.total_amount), 0), 0) AS average_amount
+                FROM orders o
+                WHERE o.status <> :cancelled
+                  AND o.received_at >= :fromTs AND o.received_at < :toTs
+                GROUP BY o.order_type
+                ORDER BY o.order_type
+                """;
+        List<?> rows = entityManager.createNativeQuery(sql)
+                .setParameter("cancelled", OrderStatus.CANCELLED.name())
+                .setParameter("fromTs", from)
+                .setParameter("toTs", to)
+                .getResultList();
+        List<OrderTypeRecord> result = new ArrayList<>(rows.size());
+        for (Object row : rows) {
+            Object[] r = (Object[]) row;
+            result.add(new OrderTypeRecord((String) r[0], toLong(r[1]), toMoney(r[2]), toMoney(r[3])));
+        }
+        return result;
+    }
+
+    /** Tổng phụ phí giặt nhanh, phụ phí đồ trắng và giảm giá của các đơn không hủy. */
+    public SurchargeTotals sumSurcharges(Instant from, Instant to) {
+        String sql = """
+                SELECT COALESCE(SUM(o.express_fee), 0), COALESCE(SUM(o.whites_fee), 0),
+                       COALESCE(SUM(o.discount_amount), 0)
+                FROM orders o
+                WHERE o.status <> :cancelled
+                  AND o.received_at >= :fromTs AND o.received_at < :toTs
+                """;
+        Object[] r = (Object[]) entityManager.createNativeQuery(sql)
+                .setParameter("cancelled", OrderStatus.CANCELLED.name())
+                .setParameter("fromTs", from)
+                .setParameter("toTs", to)
+                .getSingleResult();
+        return new SurchargeTotals(toMoney(r[0]), toMoney(r[1]), toMoney(r[2]));
+    }
+
+    /** Phiếu sự cố đang chờ Admin duyệt. */
+    public long countPendingIncidents() {
+        return toLong(entityManager.createNativeQuery("SELECT COUNT(*) FROM incidents i WHERE i.status = 'PENDING'")
+                .getSingleResult());
+    }
+
     /** Doanh thu theo kỳ và phương thức: chỉ giao dịch CONFIRMED, tính theo paid_at (BR-J04), nhóm theo giờ VN. */
     public List<RevenueRecord> sumPaymentsByPeriodAndMethod(Instant from, Instant to, Granularity granularity) {
         // Mẫu to_char (YYYY-MM-DD hoặc YYYY-MM) truyền bằng tham số, không nối chuỗi vào câu SQL

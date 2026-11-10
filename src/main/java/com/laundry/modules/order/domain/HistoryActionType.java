@@ -12,7 +12,11 @@ public enum HistoryActionType {
     RESCHEDULE("Dời ngày hẹn trả"),
     PRICE_ADJUST("Điều chỉnh giá"),
     ITEMS_UPDATED("Cập nhật danh sách món đồ"),
-    CANCELLED("Hủy đơn hàng");
+    CANCELLED("Hủy đơn hàng"),
+    PAYMENT_CONFIRMED("Xác nhận thanh toán"),
+    PAYMENT_VOIDED("Hủy / hoàn giao dịch thanh toán"),
+    DELIVERED("Giao đồ cho khách"),
+    INCIDENT_REOPEN("Mở lần xử lý mới theo phiếu sự cố");
 
     private final String description;
 }

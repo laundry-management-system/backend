@@ -101,6 +101,15 @@ public class UserController {
         userService.resend(userId);
     }
 
+    @Operation(summary = "Reset mật khẩu nhân viên",
+            description = "ADMIN reset: mật khẩu cũ hết hiệu lực ngay, nhân viên nhận mail để đặt mật khẩu mới")
+    @PostMapping("/{id}/reset-password")
+    @ResponseStatus(HttpStatus.OK)
+    @PreAuthorize("hasRole('ADMIN')")
+    public void resetPassword(@PathVariable("id") Long userId, Authentication authentication) {
+        userService.resetPassword(userId, authentication.getName());
+    }
+
     @Operation(summary = "Thiết lập mật khẩu", description = "API cho phép nhân viên thiết lập mật khẩu")
     @PostMapping("/setup-password")
     @ResponseStatus(HttpStatus.OK)

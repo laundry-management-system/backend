@@ -7,10 +7,10 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 public record ValidateVoucherRequest(
-        @NotBlank(message = "Voucher code must not be blank")
+        @NotBlank(message = "Vui lòng nhập mã voucher")
         String code,
-
-        @NotNull(message = "Order value must not be null")
-        @DecimalMin(value = "0", message = "Order value must be greater than or equal to 0")
+        @NotNull(message = "Thiếu tiền hàng của đơn")
+        @DecimalMin(value = "0", message = "Tiền hàng không được âm")
         BigDecimal orderValue
-) {}
+) {
+}

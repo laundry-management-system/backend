@@ -5,6 +5,12 @@ import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
@@ -56,6 +62,43 @@ public class GlobalExceptionHandler {
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, "File tối đa 5MB");
         pd.setProperty("errors", Map.of("file", "File tối đa 5MB"));
         return pd;
+    }
+
+    /** JSON sai cú pháp hoặc giá trị enum / ngày không đọc được. */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleUnreadable(HttpMessageNotReadableException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "Dữ liệu gửi lên không đúng định dạng");
+    }
+
+    /** Tham số URL / query sai kiểu, ví dụ status=ABC hoặc id không phải số. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, "Tham số '" + ex.getName() + "' không hợp lệ");
+        pd.setProperty("errors", Map.of(ex.getName(), "Giá trị không hợp lệ"));
+        return pd;
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ProblemDetail handleMissingParam(MissingServletRequestParameterException ex) {
+        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, "Thiếu tham số '" + ex.getParameterName() + "'");
+        pd.setProperty("errors", Map.of(ex.getParameterName(), "Bắt buộc"));
+        return pd;
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ProblemDetail handleNoResource(NoResourceFoundException ex) {
+        return problem(HttpStatus.NOT_FOUND, "Không tìm thấy đường dẫn");
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ProblemDetail handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        return problem(HttpStatus.METHOD_NOT_ALLOWED, "Phương thức " + ex.getMethod() + " không được hỗ trợ");
+    }
+
+    /** Hai thao tác cùng sửa một bản ghi; thao tác đến sau phải thử lại. */
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
+        return problem(HttpStatus.CONFLICT, "Dữ liệu vừa được người khác cập nhật, vui lòng tải lại và thử lại");
     }
 
     @ExceptionHandler(AuthenticationException.class)

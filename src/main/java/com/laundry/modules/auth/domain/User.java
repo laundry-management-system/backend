@@ -83,6 +83,12 @@ public class User extends BaseEntity {
         }
     }
 
+    /** Admin reset mật khẩu: mật khẩu cũ hết hiệu lực, tài khoản chờ đặt lại qua link email. */
+    public void resetPassword(){
+        requireActive("đặt lại mật khẩu");
+        this.status = Status.PENDING;
+    }
+
     public void setupPassword(String passwordHash){
 
         requirePending();

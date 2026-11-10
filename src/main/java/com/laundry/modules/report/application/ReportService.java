@@ -117,6 +117,13 @@ public class ReportService {
                 .map(OrderReportResponse.ServiceRevenue::revenue)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        List<OrderReportResponse.OrderTypeStat> byOrderType = reportQueryRepository.sumOrdersByType(start, end)
+                .stream()
+                .map(r -> new OrderReportResponse.OrderTypeStat(
+                        r.orderType(), r.orderCount(), r.totalAmount(), r.averageAmount()))
+                .toList();
+        ReportQueryRepository.SurchargeTotals fees = reportQueryRepository.sumSurcharges(start, end);
+
         return new OrderReportResponse(
                 period.from(), period.to(),
                 new OrderReportResponse.Summary(
@@ -124,7 +131,9 @@ public class ReportService {
                         totals.lateOrders(), lateRate(totals.lateOrders(), activeOrders),
                         totals.totalAmount(), itemsRevenue),
                 byStatus,
-                byService);
+                byService,
+                byOrderType,
+                new OrderReportResponse.Surcharges(fees.expressFee(), fees.whitesFee(), fees.discount()));
     }
 
     /** Dashboard trong ngày (giờ Việt Nam): số đơn, doanh thu, đơn trễ, đồ tồn. */
@@ -145,7 +154,8 @@ public class ReportService {
                         counts.receivedToday(), counts.cancelledToday(), counts.deliveredToday(),
                         counts.waiting(), counts.processing(), counts.readyForPickup()),
                 revenue,
-                new DashboardResponse.Alerts(counts.lateOrders(), counts.storedOrders(), storedAfterDays));
+                new DashboardResponse.Alerts(counts.lateOrders(), counts.storedOrders(), storedAfterDays,
+                        reportQueryRepository.countPendingIncidents()));
     }
 
     private static OrderReportResponse.ServiceRevenue toServiceRevenue(ServiceRevenueRecord r) {

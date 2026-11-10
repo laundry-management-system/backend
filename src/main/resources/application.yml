@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: laundry
+  config:
+    # Máy local: đọc biến môi trường từ file .env (không commit; mẫu ở .env.example). Không có file thì bỏ qua
+    import: optional:file:.env[.properties]
   datasource:
     url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/laundry?options=-c%20TimeZone=Asia/Ho_Chi_Minh}
     username: ${DB_USERNAME:laundry}

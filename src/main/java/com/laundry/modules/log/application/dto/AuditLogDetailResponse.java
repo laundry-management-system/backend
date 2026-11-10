@@ -43,7 +43,10 @@ public record AuditLogDetailResponse(
         Map<String, Object> newData,
 
         @Schema(description = "Lý do")
-        String reason
+        String reason,
+
+        @Schema(description = "Mã hiển thị của đối tượng (mã đơn, khóa tham số...)")
+        String entityCode
 ) {
     public static AuditLogDetailResponse from(AuditLog auditLog, String fullName, String username){
         return new AuditLogDetailResponse(
@@ -58,7 +61,8 @@ public record AuditLogDetailResponse(
                 auditLog.getCreatedAt(),
                 auditLog.getOldData(),
                 auditLog.getNewData(),
-                auditLog.getReason()
+                auditLog.getReason(),
+                auditLog.getEntityCode()
         );
     }
 }

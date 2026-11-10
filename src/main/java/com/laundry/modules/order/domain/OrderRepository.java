@@ -1,19 +1,17 @@
 package com.laundry.modules.order.domain;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface OrderRepository extends JpaRepository<Order, Long> {
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecificationExecutor<Order> {
 
     Optional<Order> findByOrderCode(String orderCode);
-
-    List<Order> findByCustomerPhoneOrderByCreatedAtDesc(String customerPhone);
 
     List<Order> findByStatus(OrderStatus status);
 
@@ -23,22 +21,24 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     List<Order> findByIntakeCode(String intakeCode);
 
-    @Query("""
-        SELECT o FROM Order o
-        WHERE (:status IS NULL OR o.status = :status)
-          AND (:priority IS NULL OR o.priority = :priority)
-          AND (:phone IS NULL OR o.customerPhone LIKE CONCAT('%', CAST(:phone AS string), '%'))
-          AND (:intakeCode IS NULL OR o.intakeCode = :intakeCode)
-          AND (:search IS NULL OR LOWER(o.orderCode) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%') 
-                                OR LOWER(o.customerName) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%'))
-    """)
-    Page<Order> searchOrders(
-            @Param("status") OrderStatus status,
-            @Param("priority") OrderPriority priority,
-            @Param("phone") String phone,
-            @Param("search") String search,
-            @Param("intakeCode") String intakeCode,
-            Pageable pageable
-    );
-}
+    /** [status, count] cho thanh đếm theo trạng thái. */
+    @Query("SELECT o.status, COUNT(o) FROM Order o GROUP BY o.status")
+    List<Object[]> countByStatus();
 
+    /** Đơn v3 đang Mới nhận mà chưa phân loại (chưa có dòng đồ). */
+    @Query("""
+        SELECT COUNT(o) FROM Order o
+        WHERE o.status = com.laundry.modules.order.domain.OrderStatus.RECEIVED
+          AND o.intakeCode IS NOT NULL AND o.items IS EMPTY
+    """)
+    long countUnclassified();
+
+    /** Đơn chưa hoàn thành mà đã quá ngày hẹn. */
+    @Query("""
+        SELECT COUNT(o) FROM Order o
+        WHERE o.status IN (com.laundry.modules.order.domain.OrderStatus.RECEIVED,
+                           com.laundry.modules.order.domain.OrderStatus.PROCESSING)
+          AND o.dueAt < :now
+    """)
+    long countLate(@Param("now") Instant now);
+}

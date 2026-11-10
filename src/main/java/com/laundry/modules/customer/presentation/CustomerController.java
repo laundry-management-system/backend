@@ -2,6 +2,9 @@ package com.laundry.modules.customer.presentation;
 
 import com.laundry.modules.customer.application.CustomerService;
 import com.laundry.modules.customer.application.dto.ChangeCustomerStatusRequest;
+import com.laundry.modules.customer.application.dto.ChangeCustomerVipRequest;
+import com.laundry.modules.customer.domain.CustomerStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.laundry.modules.customer.application.dto.CreateCustomerRequest;
 import com.laundry.modules.customer.application.dto.CustomerResponse;
 import com.laundry.modules.customer.application.dto.UpdateCustomerRequest;
@@ -63,13 +66,14 @@ public class CustomerController {
         return customerService.getCustomerById(id);
     }
 
-    @Operation(summary = "List customers (search by name, phone, code; supports pagination)")
+    @Operation(summary = "List customers (search by name, phone, code; filter by status; includes order stats)")
     @GetMapping
     public Page<CustomerResponse> listCustomers(
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) CustomerStatus status,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        return customerService.listCustomers(search, pageable);
+        return customerService.listCustomers(search, status, pageable);
     }
 
     @Operation(summary = "Update customer details (UC02)")
@@ -81,13 +85,24 @@ public class CustomerController {
         return customerService.updateCustomer(id, request);
     }
 
-    @Operation(summary = "Change customer status (ACTIVE / INACTIVE) - Soft deactivate per BR-B03")
+    @Operation(summary = "Change customer status (Admin). Cannot deactivate while the customer has open orders (BR-B03)")
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
     public CustomerResponse changeStatus(
             @PathVariable Long id,
             @Valid @RequestBody ChangeCustomerStatusRequest request
     ) {
         return customerService.changeStatus(id, request.status());
+    }
+
+    @Operation(summary = "Turn VIP on / off (Admin, UC20)")
+    @PatchMapping("/{id}/vip")
+    @PreAuthorize("hasRole('ADMIN')")
+    public CustomerResponse changeVip(
+            @PathVariable Long id,
+            @Valid @RequestBody ChangeCustomerVipRequest request
+    ) {
+        return customerService.changeVip(id, request.vip());
     }
 
     private String getUsername(Authentication authentication) {

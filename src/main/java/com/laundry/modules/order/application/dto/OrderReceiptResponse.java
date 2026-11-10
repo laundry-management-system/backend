@@ -38,19 +38,25 @@ public record OrderReceiptResponse(
         Boolean washWhitesSeparately,
         BigDecimal whitesFee,
         String createdBy,
-        List<ReceiptServiceLine> services
+        List<ReceiptServiceLine> services,
+        @Schema(description = "Địa chỉ tiệm (cài đặt STORE_ADDRESS)")
+        String shopAddress,
+        @Schema(description = "Mã voucher đã áp (null nếu không có)")
+        String voucherCode,
+        BigDecimal discountAmount
 ) {
     /** Dịch vụ tham khảo kèm giá hiện hành (giá tham khảo, chưa chốt). */
     public record ReceiptServiceLine(String name, ItemUnit unit, BigDecimal unitPrice,
                                      BigDecimal expressSurcharge, BigDecimal minQuantity) {
     }
 
-    public static OrderReceiptResponse from(Order order, String webBaseUrl) {
-        return from(order, webBaseUrl, 1, 1, order.getWhitesFee(), List.of());
+    /** Thông tin tiệm lấy từ cài đặt (STORE_NAME, STORE_PHONE, STORE_ADDRESS). */
+    public record ShopInfo(String name, String hotline, String address) {
     }
 
     public static OrderReceiptResponse from(Order order, String webBaseUrl, int intakeOrderIndex, int intakeOrderCount,
-                                            BigDecimal whitesFee, List<ReceiptServiceLine> services) {
+                                            BigDecimal whitesFee, List<ReceiptServiceLine> services,
+                                            ShopInfo shop, String voucherCode) {
         String base = (webBaseUrl != null && !webBaseUrl.isBlank()) ? webBaseUrl : "http://localhost:5173";
         String trackingQrUrl = base + "/track?phone=" + order.getCustomerPhone();
 
@@ -72,15 +78,18 @@ public record OrderReceiptResponse(
                 order.getReceivedAt(),
                 order.getDueAt(),
                 trackingQrUrl,
-                "Tiệm Giặt Ủi Thông Minh SE114",
-                "1900 1234",
+                shop.name(),
+                shop.hotline(),
                 order.getIntakeCode(),
                 intakeOrderIndex,
                 intakeOrderCount,
                 order.getWashWhitesSeparately(),
                 whitesFee,
                 order.getCreatedBy(),
-                services
+                services,
+                shop.address(),
+                voucherCode,
+                order.getDiscountAmount()
         );
     }
 }

@@ -46,6 +46,9 @@ public record DashboardResponse(
             long storedOrders,
 
             @Schema(description = "Số ngày dùng để xác định đồ tồn (cấu hình OVERDUE_DAYS)", example = "7")
-            int storedAfterDays
+            int storedAfterDays,
+
+            @Schema(description = "Phiếu sự cố đang chờ Admin duyệt")
+            long pendingIncidents
     ) {}
 }

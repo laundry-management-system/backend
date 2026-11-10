@@ -2,30 +2,33 @@ package com.laundry.modules.order.application;
 
 import com.laundry.common.exception.BusinessException;
 import com.laundry.common.exception.NotFoundException;
-import com.laundry.modules.customer.application.CustomerService;
-import com.laundry.modules.document.application.DocumentService;
-import com.laundry.modules.document.application.dto.DocumentResponse;
-import com.laundry.modules.document.domain.Document;
 import com.laundry.modules.order.application.dto.AddOrderItemImageRequest;
 import com.laundry.modules.order.application.dto.AdjustPriceRequest;
 import com.laundry.modules.order.application.dto.CancelOrderRequest;
 import com.laundry.modules.order.application.dto.ChangeStatusRequest;
 import com.laundry.modules.order.application.dto.CompleteOrderRequest;
-import com.laundry.modules.order.application.dto.CustomerTrackingResponse;
-import com.laundry.modules.order.application.dto.DeliverOrderRequest;
-import com.laundry.modules.order.application.dto.EstimateReturnTimeRequest;
-import com.laundry.modules.order.application.dto.EstimateReturnTimeResponse;
+import com.laundry.modules.customer.application.CustomerService;
+import com.laundry.modules.document.application.DocumentService;
+import com.laundry.modules.document.application.dto.DocumentResponse;
+import com.laundry.modules.document.domain.Document;
+import com.laundry.modules.log.application.AuditLogService;
+import com.laundry.modules.log.application.dto.AuditEntry;
+import com.laundry.modules.log.domain.AuditAction;
+import com.laundry.modules.log.domain.EntityType;
 import com.laundry.modules.order.application.dto.IntakeOrderRequest;
 import com.laundry.modules.order.application.dto.IntakeRequest;
 import com.laundry.modules.order.application.dto.IntakeResponse;
+import com.laundry.modules.order.application.dto.RequestedServiceDto;
 import com.laundry.modules.order.application.dto.OrderDetailResponse;
 import com.laundry.modules.order.application.dto.OrderImageDto;
 import com.laundry.modules.order.application.dto.OrderItemDto;
 import com.laundry.modules.order.application.dto.OrderReceiptResponse;
 import com.laundry.modules.order.application.dto.OrderResponse;
-import com.laundry.modules.order.application.dto.QuickCreateOrderRequest;
-import com.laundry.modules.order.application.dto.RequestedServiceDto;
+import com.laundry.modules.order.application.dto.OrderSearchFilter;
+import com.laundry.modules.order.domain.OrderSpecs;
+import org.springframework.data.jpa.domain.Specification;
 import com.laundry.modules.order.application.dto.RescheduleOrderRequest;
+import com.laundry.modules.payments.application.PaymentService;
 import com.laundry.modules.order.application.dto.RevertStatusRequest;
 import com.laundry.modules.order.application.dto.UpdateOrderItemsRequest;
 import com.laundry.modules.order.domain.HistoryActionType;
@@ -40,28 +43,31 @@ import com.laundry.modules.order.domain.OrderRepository;
 import com.laundry.modules.order.domain.OrderStatus;
 import com.laundry.modules.order.domain.OrderType;
 import com.laundry.modules.order.domain.PaymentStatus;
-import com.laundry.modules.order.domain.ServiceType;
 import com.laundry.modules.service.domain.LaundryService;
 import com.laundry.modules.service.domain.LaundryServiceRepository;
 import com.laundry.modules.service.domain.ServiceStatus;
+import com.laundry.modules.order.infrastructure.OrderPaymentLookup;
 import com.laundry.modules.setting.application.SettingService;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import com.laundry.modules.setting.domain.SettingKey;
+import com.laundry.modules.voucher.application.VoucherService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -76,6 +82,10 @@ public class OrderService {
     private final LaundryServiceRepository laundryServiceRepository;
     private final SettingService settingService;
     private final DocumentService documentService;
+    private final VoucherService voucherService;
+    private final OrderPaymentLookup paymentLookup;
+    private final PaymentService paymentService;
+    private final AuditLogService auditLogService;
 
     /**
      * Tạo một lượt nhận (1–2 đơn) trong một transaction. Dịch vụ chọn ở quầy chỉ lưu làm tham khảo:
@@ -177,88 +187,36 @@ public class OrderService {
 
     private OrderDetailResponse toDetail(Order order) {
         List<Long> ids = order.getRequestedServiceIds();
-        if (ids == null || ids.isEmpty()) return OrderDetailResponse.from(order, List.of());
-        Map<Long, LaundryService> byId = laundryServiceRepository.findAllById(ids).stream()
-                .collect(Collectors.toMap(LaundryService::getId, Function.identity()));
-        List<RequestedServiceDto> requested = ids.stream().map(id -> {
-            LaundryService svc = byId.get(id);
-            return svc == null ? new RequestedServiceDto(id, null, null)
-                    : new RequestedServiceDto(id, svc.getName(), ItemUnit.valueOf(svc.getUnit().name()));
-        }).toList();
-        return OrderDetailResponse.from(order, requested);
+        List<RequestedServiceDto> requested = List.of();
+        if (ids != null && !ids.isEmpty()) {
+            Map<Long, LaundryService> byId = laundryServiceRepository.findAllById(ids).stream()
+                    .collect(Collectors.toMap(LaundryService::getId, Function.identity()));
+            requested = ids.stream().map(id -> {
+                LaundryService svc = byId.get(id);
+                return svc == null ? new RequestedServiceDto(id, null, null)
+                        : new RequestedServiceDto(id, svc.getName(), ItemUnit.valueOf(svc.getUnit().name()));
+            }).toList();
+        }
+        return OrderDetailResponse.from(order, requested, extrasOf(order));
     }
 
-    @Transactional
-    public OrderDetailResponse quickCreate(QuickCreateOrderRequest request, String performedBy) {
-        Instant now = Instant.now();
-        ServiceType serviceType = request.serviceType();
-        OrderPriority priority = request.priority() != null ? request.priority() : OrderPriority.NORMAL;
-
-        OrderType orderType = request.orderType() != null
-                ? request.orderType()
-                : (priority == OrderPriority.URGENT ? OrderType.EXPRESS : OrderType.NORMAL);
-
-        BigDecimal unitPrice = request.unitPrice() != null && request.unitPrice().compareTo(BigDecimal.ZERO) > 0
-                ? request.unitPrice()
-                : serviceType.getDefaultPricePerKg();
-
-        BigDecimal subtotal = request.totalWeight()
-                .multiply(unitPrice)
-                .setScale(0, RoundingMode.HALF_UP);
-
-        BigDecimal expressFee = (orderType == OrderType.EXPRESS)
-                ? request.totalWeight().multiply(BigDecimal.valueOf(10000)).setScale(0, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
-
-        BigDecimal totalAmount = subtotal.add(expressFee);
-
-        Instant dueAt = request.dueAt();
-        if (dueAt == null) {
-            dueAt = calculateDueAt(serviceType, orderType, priority, now);
-        }
-
-        String orderCode = codeSequenceService.getNextOrderCode();
-        int bagCount = request.bagCount() != null && request.bagCount() > 0 ? request.bagCount() : 1;
-
-        Order order = Order.builder()
-                .orderCode(orderCode)
-                .customerName(request.customerName().trim())
-                .customerPhone(request.customerPhone().trim())
-                .createdBy(performedBy)
-                .serviceType(serviceType)
-                .totalWeight(request.totalWeight())
-                .unitPrice(unitPrice)
-                .subtotal(subtotal)
-                .expressFee(expressFee)
-                .totalAmount(totalAmount)
-                .note(request.customerNote())
-                .priority(priority)
-                .orderType(orderType)
-                .status(OrderStatus.RECEIVED)
-                .paymentStatus(PaymentStatus.UNPAID)
-                .bagCount(bagCount)
-                .receivedAt(now)
-                .dueAt(dueAt)
-                .build();
-
-        order.addHistory(
-                HistoryActionType.CREATED,
-                null,
-                OrderStatus.RECEIVED.name(),
-                "Tiếp nhận tại quầy (" + request.totalWeight() + " kg - " + serviceType.getDisplayName() + ")",
-                performedBy
-        );
-
-        Order saved = orderRepository.save(order);
-        log.info("Created order [{}] for [{}] with amount [{}]", saved.getOrderCode(), saved.getCustomerName(), saved.getTotalAmount());
-        return toDetail(saved);
+    private OrderDetailResponse.Extras extrasOf(Order order) {
+        String voucherCode = voucherService.findCode(order.getVoucherId()).orElse(null);
+        if (order.getId() == null) return new OrderDetailResponse.Extras(voucherCode, null, null);
+        return paymentLookup.findConfirmed(order.getId())
+                .map(p -> new OrderDetailResponse.Extras(voucherCode, p.method(), p.paidAt()))
+                .orElse(new OrderDetailResponse.Extras(voucherCode, null, null));
     }
 
     @Transactional
     public OrderReceiptResponse getReceipt(Long id, String webBaseUrl) {
         Order order = findOrderById(id);
         order.markReceiptPrinted();
-        if (!order.isIntakeV3()) return OrderReceiptResponse.from(order, webBaseUrl);
+        OrderReceiptResponse.ShopInfo shop = shopInfo();
+        String voucherCode = voucherService.findCode(order.getVoucherId()).orElse(null);
+        if (!order.isIntakeV3()) {
+            return OrderReceiptResponse.from(order, webBaseUrl, 1, 1, order.getWhitesFee(), List.of(), shop, voucherCode);
+        }
 
         List<Order> intake = orderRepository.findByIntakeCode(order.getIntakeCode()).stream()
                 .sorted(Comparator.comparing((Order o) -> o.getOrderType() != OrderType.NORMAL))
@@ -275,7 +233,15 @@ public class OrderService {
         // Chưa phân loại thì phí đồ trắng chưa chốt: in mức hiện hành để tham khảo
         BigDecimal whitesFee = !Boolean.TRUE.equals(order.getWashWhitesSeparately()) ? BigDecimal.ZERO
                 : order.getItems().isEmpty() ? settingService.getWhitesFee() : order.getWhitesFee();
-        return OrderReceiptResponse.from(order, webBaseUrl, Math.max(index, 1), Math.max(intake.size(), 1), whitesFee, lines);
+        return OrderReceiptResponse.from(order, webBaseUrl, Math.max(index, 1), Math.max(intake.size(), 1), whitesFee, lines,
+                shop, voucherCode);
+    }
+
+    private OrderReceiptResponse.ShopInfo shopInfo() {
+        return new OrderReceiptResponse.ShopInfo(
+                settingService.getString(SettingKey.STORE_NAME, "Tiệm giặt ủi"),
+                settingService.getString(SettingKey.STORE_PHONE, null),
+                settingService.getString(SettingKey.STORE_ADDRESS, null));
     }
 
     @Transactional
@@ -360,8 +326,25 @@ public class OrderService {
 
         order.updateItems(items, performedBy);
         order.setWhitesFee(Boolean.TRUE.equals(order.getWashWhitesSeparately()) ? settingService.getWhitesFee() : BigDecimal.ZERO);
-        order.recalcTotals(request.discountAmount());
+        // Tính tiền hàng trước (chưa giảm) để kiểm tra đơn tối thiểu của voucher
+        order.recalcTotals(BigDecimal.ZERO);
+        // Giảm giá chỉ đến từ voucher do BE kiểm tra; discountAmount client gửi bị bỏ qua (vấn đề A)
+        BigDecimal discount = applyVoucher(order, request.voucherCode());
+        order.recalcTotals(discount);
         return toDetail(orderRepository.saveAndFlush(order));
+    }
+
+    /** Áp / đổi / bỏ voucher lúc phân loại; trả số tiền giảm. Lượt dùng được giữ ngay khi áp. */
+    private BigDecimal applyVoucher(Order order, String voucherCode) {
+        Long current = order.getVoucherId();
+        if (voucherCode == null || voucherCode.isBlank()) {
+            voucherService.release(current);
+            order.setVoucherId(null);
+            return BigDecimal.ZERO;
+        }
+        VoucherService.AppliedVoucher applied = voucherService.applyToOrder(voucherCode, order.getSubtotal(), current);
+        order.setVoucherId(applied.voucherId());
+        return applied.discount();
     }
 
     @Transactional
@@ -404,16 +387,12 @@ public class OrderService {
     }
 
     @Transactional
-    public OrderDetailResponse deliverOrder(Long id, DeliverOrderRequest request, String performedBy) {
-        Order order = findOrderById(id);
-        order.deliver(request.receiverName(), request.receiverRelation(), performedBy);
-        return toDetail(order);
-    }
-
-    @Transactional
     public OrderDetailResponse revertStatus(Long id, RevertStatusRequest request, String performedBy) {
         Order order = findOrderById(id);
+        OrderStatus before = order.getStatus();
         order.revertStatus(request.targetStatus(), request.reason(), performedBy);
+        audit(AuditAction.STATUS_ROLLBACK, order, Map.of("status", before.name()),
+                Map.of("status", order.getStatus().name()), request.reason());
         return toDetail(order);
     }
 
@@ -424,54 +403,105 @@ public class OrderService {
         if (targetDueAt == null) {
             throw new BusinessException("Thời gian hẹn trả mới không được để trống");
         }
+        Instant before = order.getDueAt();
         order.reschedule(targetDueAt, request.reason(), performedBy);
+        audit(AuditAction.DUE_DATE_CHANGE, order, Map.of("dueAt", before.toString()),
+                Map.of("dueAt", targetDueAt.toString()), request.reason());
         return toDetail(order);
     }
 
     @Transactional
     public OrderDetailResponse adjustPrice(Long id, AdjustPriceRequest request, String performedBy) {
         Order order = findOrderById(id);
+        Map<String, Object> before = priceSnapshot(order);
         order.adjustPrice(request.newTotalAmount(), request.reason(), performedBy);
+        // Giá Admin nhập là giá cuối: gỡ voucher và trả lượt để hóa đơn / báo cáo không lệch
+        if (order.getVoucherId() != null) {
+            voucherService.release(order.getVoucherId());
+            order.setVoucherId(null);
+            order.setDiscountAmount(BigDecimal.ZERO);
+        }
+        audit(AuditAction.ORDER_PRICE_EDIT, order, before, priceSnapshot(order), request.reason());
         return toDetail(order);
     }
 
+    /**
+     * Hủy đơn Mới nhận (BR-D05). Đơn đã thanh toán: giao dịch chuyển sang Đã hoàn tiền.
+     * Đơn có voucher: trả lượt. Tất cả trong một transaction.
+     */
     @Transactional
     public OrderDetailResponse cancel(Long id, CancelOrderRequest request, String performedBy) {
         Order order = findOrderById(id);
-        order.cancel(request.reason(), performedBy);
+        if (order.getStatus() != OrderStatus.RECEIVED) {
+            order.cancel(request.reason(), performedBy); // ném lỗi BR-D05 với thông báo đầy đủ
+        }
+        String reason = request.reason().trim();
+        Map<String, Object> before = Map.of("status", order.getStatus().name(),
+                "paymentStatus", order.getPaymentStatus().name());
+        if (order.getPaymentStatus() == PaymentStatus.PAID) {
+            paymentService.refundForCancelledOrder(order.getId(), order.getOrderCode(), "Hủy đơn: " + reason, performedBy);
+            order.markRefunded("Hoàn tiền do hủy đơn: " + reason, performedBy);
+        }
+        if (order.getVoucherId() != null) {
+            voucherService.release(order.getVoucherId());
+        }
+        order.cancel(reason, performedBy);
+        audit(AuditAction.ORDER_CANCEL, order, before, Map.of("status", order.getStatus().name(),
+                "paymentStatus", order.getPaymentStatus().name()), reason);
         return toDetail(order);
     }
 
-    @Transactional(readOnly = true)
-    public EstimateReturnTimeResponse estimateReturnTime(EstimateReturnTimeRequest request) {
-        Instant now = Instant.now();
-        OrderPriority priority = request.priority() != null ? request.priority() : OrderPriority.NORMAL;
-        OrderType orderType = (priority == OrderPriority.URGENT) ? OrderType.EXPRESS : OrderType.NORMAL;
-        Instant dueTime = calculateDueAt(request.serviceType(), orderType, priority, now);
-        int hours = (int) Duration.between(now, dueTime).toHours();
+    private void audit(AuditAction action, Order order, Map<String, Object> before, Map<String, Object> after,
+                       String reason) {
+        auditLogService.log(new AuditEntry(action, EntityType.ORDER, order.getId(), before, after, reason,
+                order.getOrderCode()));
+    }
 
-        String explanation = String.format("Dịch vụ '%s' (%s) dự kiến xử lý trong khoảng %d giờ",
-                request.serviceType().getDisplayName(), orderType.getDescription(), hours);
-
-        return new EstimateReturnTimeResponse(dueTime, hours, explanation);
+    private static Map<String, Object> priceSnapshot(Order order) {
+        Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("totalAmount", order.getTotalAmount());
+        data.put("discountAmount", order.getDiscountAmount());
+        data.put("voucherId", order.getVoucherId());
+        return data;
     }
 
     @Transactional(readOnly = true)
-    public List<CustomerTrackingResponse> trackByPhone(String phone) {
-        if (phone == null || phone.isBlank()) {
-            return List.of();
+    public Page<OrderResponse> getOrders(OrderSearchFilter f, Pageable pageable) {
+        if (f.receivedFrom() != null && f.receivedTo() != null && !f.receivedTo().isAfter(f.receivedFrom())) {
+            throw new BusinessException("receivedTo phải sau receivedFrom", "receivedTo");
         }
-        List<Order> orders = orderRepository.findByCustomerPhoneOrderByCreatedAtDesc(phone.trim());
-        return orders.stream().map(CustomerTrackingResponse::from).toList();
+        Specification<Order> spec = Specification.allOf(java.util.stream.Stream.of(
+                        OrderSpecs.hasStatus(f.status()),
+                        OrderSpecs.hasPriority(f.priority()),
+                        OrderSpecs.hasPhone(clean(f.phone())),
+                        OrderSpecs.search(clean(f.search())),
+                        OrderSpecs.hasIntakeCode(clean(f.intakeCode())),
+                        OrderSpecs.hasCustomer(f.customerId()),
+                        OrderSpecs.receivedFrom(f.receivedFrom()),
+                        OrderSpecs.receivedBefore(f.receivedTo()),
+                        OrderSpecs.hasPaymentStatus(f.paymentStatus()),
+                        OrderSpecs.hasOrderType(f.orderType()),
+                        OrderSpecs.isClassified(f.classified()))
+                .filter(Objects::nonNull)
+                .toList());
+        return orderRepository.findAll(spec, pageable).map(OrderResponse::from);
     }
 
+    /** Số đơn theo trạng thái, kèm số đơn chưa phân loại và số đơn trễ hẹn (thanh đếm WF-D01 / B02). */
     @Transactional(readOnly = true)
-    public Page<OrderResponse> getOrders(OrderStatus status, OrderPriority priority, String phone, String search, String intakeCode, Pageable pageable) {
-        String cleanPhone = (phone != null && !phone.isBlank()) ? phone.trim() : null;
-        String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
-        String cleanIntake = (intakeCode != null && !intakeCode.isBlank()) ? intakeCode.trim() : null;
-        return orderRepository.searchOrders(status, priority, cleanPhone, cleanSearch, cleanIntake, pageable)
-                .map(OrderResponse::from);
+    public Map<String, Long> countOrders() {
+        Map<String, Long> counts = new java.util.LinkedHashMap<>();
+        for (OrderStatus s : OrderStatus.values()) counts.put(s.name(), 0L);
+        for (Object[] row : orderRepository.countByStatus()) {
+            counts.put(((OrderStatus) row[0]).name(), ((Number) row[1]).longValue());
+        }
+        counts.put("UNCLASSIFIED", orderRepository.countUnclassified());
+        counts.put("LATE", orderRepository.countLate(Instant.now()));
+        return counts;
+    }
+
+    private static String clean(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 
     @Transactional(readOnly = true)
@@ -482,15 +512,5 @@ public class OrderService {
     private Order findOrderById(Long id) {
         return orderRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy đơn hàng với ID: " + id));
-    }
-
-    private Instant calculateDueAt(ServiceType serviceType, OrderType orderType, OrderPriority priority, Instant baseTime) {
-        int hours = serviceType.getStandardHours();
-        if (orderType == OrderType.EXPRESS || priority == OrderPriority.URGENT) {
-            hours = Math.max(2, hours / 2);
-        } else if (priority == OrderPriority.HIGH) {
-            hours = Math.max(4, (int) (hours * 0.75));
-        }
-        return baseTime.plus(Duration.ofHours(hours));
     }
 }
