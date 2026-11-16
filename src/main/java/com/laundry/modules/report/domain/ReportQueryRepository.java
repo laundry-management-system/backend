@@ -29,7 +29,9 @@ public class ReportQueryRepository {
     public record ActiveOrderTotals(long lateOrders, BigDecimal totalAmount) {}
 
     public record ServiceRevenueRecord(Long serviceId, String serviceCode, String serviceName,
-                                       long orderCount, BigDecimal revenue) {}
+                                       long orderCount, BigDecimal revenue, BigDecimal quantity, String unit) {}
+
+    public record OrderPeriodCount(String period, long received) {}
 
     public record DashboardOrderCounts(long received, long cancelled, long delivered,
                                        long waiting, long processing, long readyForPickup,
@@ -64,6 +66,31 @@ public class ReportQueryRepository {
         for (Object row : rows) {
             Object[] r = (Object[]) row;
             result.add(new RevenueRecord((String) r[0], (String) r[1], toMoney(r[2]), toLong(r[3])));
+        }
+        return result;
+    }
+
+    /** Số đơn nhận theo ngày/tháng (giờ VN), gồm cả đơn đã hủy để khớp tổng số đơn. */
+    public List<OrderPeriodCount> countOrdersByPeriod(Instant from, Instant to, Granularity granularity) {
+        String sql = """
+                SELECT to_char(o.received_at AT TIME ZONE 'Asia/Ho_Chi_Minh', :pattern) AS period,
+                       COUNT(*) AS cnt
+                FROM orders o
+                WHERE o.received_at >= :fromTs AND o.received_at < :toTs
+                GROUP BY 1
+                ORDER BY 1
+                """;
+
+        List<?> rows = entityManager.createNativeQuery(sql)
+                .setParameter("pattern", granularity.getSqlPattern())
+                .setParameter("fromTs", from)
+                .setParameter("toTs", to)
+                .getResultList();
+
+        List<OrderPeriodCount> result = new ArrayList<>(rows.size());
+        for (Object row : rows) {
+            Object[] r = (Object[]) row;
+            result.add(new OrderPeriodCount((String) r[0], toLong(r[1])));
         }
         return result;
     }
@@ -120,13 +147,15 @@ public class ReportQueryRepository {
                        s.service_code AS service_code,
                        COALESCE(s.name, 'Khác') AS service_name,
                        COUNT(DISTINCT o.id) AS order_count,
-                       COALESCE(SUM(oi.line_total), 0) AS revenue
+                       COALESCE(SUM(oi.line_total), 0) AS revenue,
+                       COALESCE(SUM(oi.quantity), 0) AS quantity,
+                       s.unit AS unit
                 FROM orders o
                 JOIN order_items oi ON oi.order_id = o.id
                 LEFT JOIN services s ON s.id = oi.service_id
                 WHERE o.status <> :cancelled
                   AND o.received_at >= :fromTs AND o.received_at < :toTs
-                GROUP BY s.id, s.service_code, s.name
+                GROUP BY s.id, s.service_code, s.name, s.unit
                 ORDER BY revenue DESC, service_name
                 """;
 
@@ -144,7 +173,9 @@ public class ReportQueryRepository {
                     (String) r[1],
                     (String) r[2],
                     toLong(r[3]),
-                    toMoney(r[4])));
+                    toMoney(r[4]),
+                    toMoney(r[5]),
+                    (String) r[6]));
         }
         return result;
     }

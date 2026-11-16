@@ -1,5 +1,6 @@
 package com.laundry.modules.report.application.dto;
 
+import com.laundry.modules.report.domain.Granularity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -13,14 +14,28 @@ public record OrderReportResponse(
         @Schema(description = "Ngày kết thúc", example = "2026-10-31")
         LocalDate to,
 
+        @Schema(description = "Đơn vị gom nhóm của rows", example = "DAY")
+        Granularity granularity,
+
         Summary summary,
 
         @Schema(description = "Số đơn theo từng trạng thái (đủ mọi trạng thái, không có thì 0)")
         List<StatusCount> byStatus,
 
         @Schema(description = "Doanh thu theo dịch vụ, sắp giảm dần theo doanh thu")
-        List<ServiceRevenue> byService
+        List<ServiceRevenue> byService,
+
+        @Schema(description = "Số đơn nhận theo từng ngày/tháng (gồm đơn đã hủy), đã điền 0 cho mốc không có đơn")
+        List<PeriodCount> rows
 ) {
+
+    @Schema(description = "Số đơn nhận của một mốc")
+    public record PeriodCount(
+            @Schema(description = "Nhãn mốc: yyyy-MM-dd (DAY) hoặc yyyy-MM (MONTH)", example = "2026-10-01")
+            String period,
+
+            long received
+    ) {}
 
     @Schema(description = "Tổng hợp đơn hàng trong kỳ")
     public record Summary(
@@ -67,6 +82,12 @@ public record OrderReportResponse(
             long orderCount,
 
             @Schema(description = "Tổng thành tiền các dòng của dịch vụ")
-            BigDecimal revenue
+            BigDecimal revenue,
+
+            @Schema(description = "Tổng khối lượng / số lượng tính tiền", example = "742.5")
+            BigDecimal quantity,
+
+            @Schema(description = "Đơn vị của dịch vụ: KG, PIECE, SET, PRODUCT; null với dòng \"Khác\"")
+            String unit
     ) {}
 }

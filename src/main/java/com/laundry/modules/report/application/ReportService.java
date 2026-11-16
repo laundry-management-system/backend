@@ -12,6 +12,7 @@ import com.laundry.modules.report.domain.ReportPeriod;
 import com.laundry.modules.report.domain.ReportQueryRepository;
 import com.laundry.modules.report.domain.ReportQueryRepository.ActiveOrderTotals;
 import com.laundry.modules.report.domain.ReportQueryRepository.DashboardOrderCounts;
+import com.laundry.modules.report.domain.ReportQueryRepository.OrderPeriodCount;
 import com.laundry.modules.report.domain.ReportQueryRepository.OrderStatusCount;
 import com.laundry.modules.report.domain.ReportQueryRepository.RevenueRecord;
 import com.laundry.modules.report.domain.ReportQueryRepository.ServiceRevenueRecord;
@@ -66,12 +67,16 @@ public class ReportService {
             buckets.put(label, new Bucket());
         }
 
+        long cashCount = 0;
+        long bankTransferCount = 0;
         for (RevenueRecord row : records) {
             Bucket bucket = buckets.computeIfAbsent(row.period(), k -> new Bucket());
             if (PaymentMethod.CASH.name().equals(row.method())) {
                 bucket.cash = bucket.cash.add(row.total());
+                cashCount += row.paymentCount();
             } else if (PaymentMethod.BANK_TRANSFER.name().equals(row.method())) {
                 bucket.bankTransfer = bucket.bankTransfer.add(row.total());
+                bankTransferCount += row.paymentCount();
             }
             // total cộng mọi phương thức để không mất tiền khi có phương thức mới
             bucket.total = bucket.total.add(row.total());
@@ -97,13 +102,15 @@ public class ReportService {
 
         return new RevenueReportResponse(
                 period.from(), period.to(), granularity, rows,
-                new RevenueReportResponse.Summary(cash, bankTransfer, total, paymentCount));
+                new RevenueReportResponse.Summary(
+                        cash, bankTransfer, total, paymentCount, cashCount, bankTransferCount));
     }
 
     /** BM12: số đơn, tỉ lệ trễ và doanh thu theo dịch vụ. */
     @Transactional(readOnly = true)
-    public OrderReportResponse getOrderReport(String rawFrom, String rawTo) {
+    public OrderReportResponse getOrderReport(String rawFrom, String rawTo, String rawGranularity) {
         ReportPeriod period = ReportPeriod.of(rawFrom, rawTo);
+        Granularity granularity = Granularity.parse(rawGranularity);
         Instant start = period.startInstant();
         Instant end = period.endInstant();
 
@@ -130,14 +137,27 @@ public class ReportService {
                 .map(OrderReportResponse.ServiceRevenue::revenue)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        // Điền sẵn mọi mốc với 0 để FE vẽ đường không bị đứt
+        Map<String, Long> received = new LinkedHashMap<>();
+        for (String label : granularity.periods(period.from(), period.to())) {
+            received.put(label, 0L);
+        }
+        for (OrderPeriodCount c : reportQueryRepository.countOrdersByPeriod(start, end, granularity)) {
+            received.put(c.period(), c.received());
+        }
+        List<OrderReportResponse.PeriodCount> rows = received.entrySet().stream()
+                .map(e -> new OrderReportResponse.PeriodCount(e.getKey(), e.getValue()))
+                .toList();
+
         return new OrderReportResponse(
-                period.from(), period.to(),
+                period.from(), period.to(), granularity,
                 new OrderReportResponse.Summary(
                         totalOrders, cancelledOrders, activeOrders,
                         totals.lateOrders(), lateRate(totals.lateOrders(), activeOrders),
                         totals.totalAmount(), itemsRevenue),
                 byStatus,
-                byService);
+                byService,
+                rows);
     }
 
     /** Dashboard theo kỳ (giờ Việt Nam): số đơn, doanh thu, đơn trễ, đồ tồn, kèm kỳ liền trước để so sánh. */
@@ -169,7 +189,8 @@ public class ReportService {
 
     private static OrderReportResponse.ServiceRevenue toServiceRevenue(ServiceRevenueRecord r) {
         return new OrderReportResponse.ServiceRevenue(
-                r.serviceId(), r.serviceCode(), r.serviceName(), r.orderCount(), r.revenue());
+                r.serviceId(), r.serviceCode(), r.serviceName(), r.orderCount(), r.revenue(),
+                r.quantity(), r.unit());
     }
 
     private static BigDecimal lateRate(long lateOrders, long activeOrders) {

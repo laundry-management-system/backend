@@ -93,7 +93,8 @@ public class ReportController {
             description = "Số đơn theo trạng thái, tỉ lệ trễ và doanh thu theo dịch vụ, tính trên các đơn nhận "
                     + "trong khoảng ngày (giờ Việt Nam). Đơn trễ: đơn không hủy mà thời điểm hoàn thành "
                     + "(hoặc hiện tại nếu chưa hoàn thành) vượt ngày hẹn. Doanh thu theo dịch vụ là tổng thành tiền "
-                    + "các dòng đơn, chưa gồm giảm giá và phụ phí cấp đơn. Khoảng tối đa 366 ngày."
+                    + "các dòng đơn, chưa gồm giảm giá và phụ phí cấp đơn; kèm tổng khối lượng / số lượng và đơn vị. "
+                    + "rows: số đơn nhận theo ngày hoặc tháng (granularity). Khoảng tối đa 366 ngày."
     )
     @GetMapping("/orders")
     @ResponseStatus(HttpStatus.OK)
@@ -101,7 +102,9 @@ public class ReportController {
             @Parameter(description = "Ngày bắt đầu, dạng yyyy-MM-dd", example = "2026-10-01")
             @RequestParam(required = false) String from,
             @Parameter(description = "Ngày kết thúc (gồm cả ngày này), dạng yyyy-MM-dd", example = "2026-10-31")
-            @RequestParam(required = false) String to) {
-        return reportService.getOrderReport(from, to);
+            @RequestParam(required = false) String to,
+            @Parameter(description = "DAY hoặc MONTH, mặc định DAY", example = "DAY")
+            @RequestParam(required = false) String granularity) {
+        return reportService.getOrderReport(from, to, granularity);
     }
 }

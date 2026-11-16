@@ -47,6 +47,12 @@ public record RevenueReportResponse(
             BigDecimal cash,
             BigDecimal bankTransfer,
             BigDecimal total,
-            long paymentCount
+            long paymentCount,
+
+            @Schema(description = "Số giao dịch tiền mặt")
+            long cashCount,
+
+            @Schema(description = "Số giao dịch chuyển khoản")
+            long bankTransferCount
     ) {}
 }
