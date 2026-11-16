@@ -4,7 +4,9 @@ import com.laundry.modules.order.domain.OrderStatus;
 import com.laundry.modules.payments.domain.PaymentStatus;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -29,9 +31,12 @@ public class ReportQueryRepository {
     public record ServiceRevenueRecord(Long serviceId, String serviceCode, String serviceName,
                                        long orderCount, BigDecimal revenue) {}
 
-    public record DashboardOrderCounts(long receivedToday, long cancelledToday, long deliveredToday,
+    public record DashboardOrderCounts(long received, long cancelled, long delivered,
                                        long waiting, long processing, long readyForPickup,
                                        long lateOrders, long storedOrders) {}
+
+    public record RevenuePaymentRecord(Long paymentId, Instant paidAt, String method, BigDecimal amount,
+                                       String invoiceNo, Long orderId, String orderCode, String customerName) {}
 
     /** Doanh thu theo kỳ và phương thức: chỉ giao dịch CONFIRMED, tính theo paid_at (BR-J04), nhóm theo giờ VN. */
     public List<RevenueRecord> sumPaymentsByPeriodAndMethod(Instant from, Instant to, Granularity granularity) {
@@ -151,10 +156,10 @@ public class ReportQueryRepository {
      */
     public DashboardOrderCounts countDashboardOrders(Instant from, Instant to, Instant storedBefore) {
         String sql = """
-                SELECT COUNT(*) FILTER (WHERE o.received_at >= :fromTs AND o.received_at < :toTs) AS received_today,
+                SELECT COUNT(*) FILTER (WHERE o.received_at >= :fromTs AND o.received_at < :toTs) AS received,
                        COUNT(*) FILTER (WHERE o.received_at >= :fromTs AND o.received_at < :toTs
-                                          AND o.status = :cancelled) AS cancelled_today,
-                       COUNT(*) FILTER (WHERE o.delivered_at >= :fromTs AND o.delivered_at < :toTs) AS delivered_today,
+                                          AND o.status = :cancelled) AS cancelled,
+                       COUNT(*) FILTER (WHERE o.delivered_at >= :fromTs AND o.delivered_at < :toTs) AS delivered,
                        COUNT(*) FILTER (WHERE o.status = :received) AS waiting,
                        COUNT(*) FILTER (WHERE o.status = :processing) AS processing,
                        COUNT(*) FILTER (WHERE o.status = :completed) AS ready_for_pickup,
@@ -179,6 +184,43 @@ public class ReportQueryRepository {
 
         return new DashboardOrderCounts(toLong(r[0]), toLong(r[1]), toLong(r[2]), toLong(r[3]),
                 toLong(r[4]), toLong(r[5]), toLong(r[6]), toLong(r[7]));
+    }
+
+    /**
+     * Từng giao dịch tạo nên doanh thu trong [from, to): cùng điều kiện với {@link #sumPaymentsByPeriodAndMethod}
+     * để tổng luôn khớp báo cáo. Mới nhất trước.
+     */
+    public List<RevenuePaymentRecord> findRevenuePayments(Instant from, Instant to, int limit) {
+        String sql = """
+                SELECT p.id, p.paid_at, p.method, p.amount, p.invoice_no, o.id, o.order_code, o.customer_name
+                FROM payments p
+                JOIN orders o ON o.id = p.order_id
+                WHERE p.status = :confirmed
+                  AND p.paid_at >= :fromTs AND p.paid_at < :toTs
+                ORDER BY p.paid_at DESC
+                """;
+
+        List<?> rows = entityManager.createNativeQuery(sql)
+                .setParameter("confirmed", PaymentStatus.CONFIRMED.name())
+                .setParameter("fromTs", from)
+                .setParameter("toTs", to)
+                .setMaxResults(limit)
+                .getResultList();
+
+        List<RevenuePaymentRecord> result = new ArrayList<>(rows.size());
+        for (Object row : rows) {
+            Object[] r = (Object[]) row;
+            result.add(new RevenuePaymentRecord(
+                    ((Number) r[0]).longValue(), toInstant(r[1]), (String) r[2], toMoney(r[3]),
+                    (String) r[4], ((Number) r[5]).longValue(), (String) r[6], (String) r[7]));
+        }
+        return result;
+    }
+
+    private static Instant toInstant(Object value) {
+        if (value instanceof Instant i) return i;
+        if (value instanceof OffsetDateTime odt) return odt.toInstant();
+        return ((Timestamp) value).toInstant();
     }
 
     private static long toLong(Object value) {
