@@ -18,5 +18,5 @@ public interface OrderIntegration {
 
     void appendNote(long orderId, String note);
 
-    List<OrderSnapshot> findOverdue(Instant completedBefore);
+    List<OverdueSnapshot> findOverdue(Instant completedBefore);
 }

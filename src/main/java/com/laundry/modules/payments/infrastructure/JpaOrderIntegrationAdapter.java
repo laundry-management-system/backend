@@ -4,6 +4,7 @@ import com.laundry.common.exception.BusinessException;
 import com.laundry.common.exception.NotFoundException;
 import com.laundry.modules.payments.application.port.OrderIntegration;
 import com.laundry.modules.payments.application.port.OrderSnapshot;
+import com.laundry.modules.payments.application.port.OverdueSnapshot;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import java.math.BigDecimal;
@@ -133,15 +134,20 @@ public class JpaOrderIntegrationAdapter implements OrderIntegration {
 
     @Override
     @Transactional(readOnly = true)
-    public List<OrderSnapshot> findOverdue(Instant completedBefore) {
-        Query query = entityManager.createNativeQuery(ORDER_SELECT + """
+    public List<OverdueSnapshot> findOverdue(Instant completedBefore) {
+        // Wraps ORDER_SELECT so map() keeps its column indexes; VIP flag is appended as the last column
+        Query query = entityManager.createNativeQuery("SELECT x.*, COALESCE(c.is_vip, false) FROM ("
+                + ORDER_SELECT + """
                  WHERE o.status = 'COMPLETED' AND o.completed_at < :completedBefore
-                 ORDER BY o.completed_at ASC
+                ) x
+                LEFT JOIN customers c ON c.id = x.customer_id
+                ORDER BY x.completed_at ASC
                 """);
         query.setParameter("completedBefore", Timestamp.from(completedBefore));
         query.setMaxResults(200);
         return ((List<?>) query.getResultList()).stream()
-                .map(row -> map((Object[]) row))
+                .map(row -> (Object[]) row)
+                .map(row -> new OverdueSnapshot(map(row), Boolean.TRUE.equals(row[row.length - 1])))
                 .toList();
     }
 

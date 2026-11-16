@@ -8,12 +8,11 @@ import com.laundry.modules.payments.application.dto.ComposeNotificationRequest;
 import com.laundry.modules.payments.application.dto.DeliveryRequest;
 import com.laundry.modules.payments.application.dto.DeliveryResponse;
 import com.laundry.modules.payments.application.dto.NotificationResponse;
-import com.laundry.modules.payments.application.dto.OverdueOrderResponse;
+import com.laundry.modules.payments.application.dto.OverdueOrderListResponse;
 import com.laundry.modules.payments.application.dto.PaymentDiscrepancyRequest;
 import com.laundry.modules.payments.application.dto.PaymentDiscrepancyResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -50,7 +49,7 @@ public class OrderEngagementController {
     }
 
     @GetMapping("/overdue")
-    public List<OverdueOrderResponse> overdueOrders() {
+    public OverdueOrderListResponse overdueOrders() {
         return overdueOrderService.list();
     }
 
