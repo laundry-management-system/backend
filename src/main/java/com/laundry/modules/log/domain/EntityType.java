@@ -10,5 +10,6 @@ public enum EntityType {
     SETTING,
     MACHINE,
     VOUCHER,
-    INCIDENT
+    INCIDENT,
+    SHIFT
 }

@@ -11,6 +11,7 @@ import com.laundry.modules.payments.application.dto.VietQrResponse;
 import com.laundry.modules.payments.application.port.AuditLogPort;
 import com.laundry.modules.payments.application.port.OrderIntegration;
 import com.laundry.modules.payments.application.port.OrderSnapshot;
+import com.laundry.modules.payments.application.port.ShiftIntegration;
 import com.laundry.modules.payments.domain.Payment;
 import com.laundry.modules.payments.domain.PaymentRepository;
 import com.laundry.modules.payments.domain.PaymentResolution;
@@ -36,6 +37,7 @@ public class PaymentService {
     private final OrderIntegration orderIntegration;
     private final ActorIdResolver actorIdResolver;
     private final AuditLogPort auditLogPort;
+    private final ShiftIntegration shiftIntegration;
     private final VietQrProperties vietQrProperties;
 
     @Transactional(readOnly = true)
@@ -98,8 +100,10 @@ public class PaymentService {
             throw new BusinessException("Thời điểm thanh toán phải từ lúc nhận đơn đến hiện tại");
         }
         long actorId = actorIdResolver.resolveId(username);
+        // Khóa ca đang mở tới hết giao dịch để không lọt vào ca đang được kết (BR-K03)
+        long shiftId = shiftIntegration.lockOpenShiftId();
         Payment payment = Payment.confirmed(order.id(), request.amount(), request.method(), paidAt, actorId,
-                normalize(request.referenceCode()), invoiceNumber());
+                normalize(request.referenceCode()), invoiceNumber(), shiftId);
         try {
             payment = paymentRepository.saveAndFlush(payment);
         } catch (DataIntegrityViolationException ex) {
@@ -127,7 +131,8 @@ public class PaymentService {
         long adminId = actorIdResolver.resolveId(username);
         Instant now = Instant.now();
         PaymentStatus previousStatus = payment.getStatus();
-        payment.resolve(request.resolution(), adminId, now, request.reason().trim());
+        long shiftId = shiftIntegration.lockOpenShiftId();
+        payment.resolve(request.resolution(), adminId, now, request.reason().trim(), shiftId);
         paymentRepository.saveAndFlush(payment);
         orderIntegration.setPaymentStatus(order.id(), false);
         String auditAction = request.resolution() == PaymentResolution.REFUNDED
