@@ -57,5 +57,12 @@ VALUES
     ('STORE_NAME', 'Laundry Shop', 'Tên cửa hàng giặt ủi', NULL, NOW()),
     ('STORE_ADDRESS', 'Chưa cập nhật', 'Địa chỉ cửa hàng giặt ủi', NULL, NOW()),
 
-    ('WHITES_FEE', '80000', 'Phụ phí giặt riêng đồ trắng (đ/đơn)', NULL, NOW())
+    ('WHITES_FEE', '80000', 'Phụ phí giặt riêng đồ trắng (đ/đơn)', NULL, NOW()),
+
+    ('SHIFT_WARN_HOURS', '14', 'Cảnh báo ca mở quá số giờ này mà chưa kết', NULL, NOW())
 ON CONFLICT (setting_key) DO NOTHING;
+
+-- Tối đa một ca đang mở (BR-K01); Hibernate ddl-auto không tạo được index một phần
+CREATE UNIQUE INDEX IF NOT EXISTS uk_shifts_one_open ON shifts ((true)) WHERE status = 'OPEN';
+CREATE INDEX IF NOT EXISTS idx_payments_shift ON payments (shift_id);
+CREATE INDEX IF NOT EXISTS idx_payments_resolved_shift ON payments (resolved_shift_id);

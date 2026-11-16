@@ -3,10 +3,13 @@ package com.laundry.modules.report.presentation;
 import com.laundry.modules.report.application.ReportService;
 import com.laundry.modules.report.application.dto.DashboardResponse;
 import com.laundry.modules.report.application.dto.OrderReportResponse;
+import com.laundry.modules.report.application.dto.RevenuePaymentResponse;
 import com.laundry.modules.report.application.dto.RevenueReportResponse;
+import com.laundry.modules.report.domain.ReportPeriod;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -51,18 +54,38 @@ public class ReportController {
     }
 
     @Operation(
-            summary = "Dashboard trong ngày",
-            description = "Số liệu của ngày hôm nay theo giờ Việt Nam. orders: đơn nhận hôm nay (gồm đã hủy), "
-                    + "số đã hủy trong đó, đơn giao hôm nay; waiting / processing / readyForPickup là số đơn "
-                    + "hiện đang ở Mới nhận / Đang xử lý / Hoàn thành chờ lấy (không giới hạn trong ngày). "
-                    + "revenue: giao dịch đã xác nhận có thời điểm thanh toán hôm nay, cùng cách tính với báo cáo doanh thu. "
-                    + "alerts.lateOrders: đơn Mới nhận hoặc Đang xử lý đã quá ngày hẹn; alerts.storedOrders: đơn Hoàn thành "
-                    + "quá storedAfterDays ngày (cấu hình OVERDUE_DAYS) mà khách chưa lấy, cùng định nghĩa với danh sách đồ tồn."
+            summary = "Giao dịch tạo nên doanh thu",
+            description = "Các giao dịch đã xác nhận có thời điểm thanh toán trong khoảng ngày (giờ Việt Nam), cùng điều kiện "
+                    + "với báo cáo doanh thu nên tổng số tiền khớp với báo cáo. Mới nhất trước, tối đa 1000 dòng."
+    )
+    @GetMapping("/revenue/payments")
+    @ResponseStatus(HttpStatus.OK)
+    public List<RevenuePaymentResponse> getRevenuePayments(
+            @Parameter(description = "Ngày bắt đầu, dạng yyyy-MM-dd", example = "2026-11-05")
+            @RequestParam(required = false) String from,
+            @Parameter(description = "Ngày kết thúc (gồm cả ngày này), dạng yyyy-MM-dd", example = "2026-11-05")
+            @RequestParam(required = false) String to) {
+        return reportService.getRevenuePayments(from, to);
+    }
+
+    @Operation(
+            summary = "Dashboard theo kỳ",
+            description = "from/to (yyyy-MM-dd, giờ Việt Nam, gồm cả hai đầu); bỏ cả hai = hôm nay, tối đa 366 ngày. "
+                    + "orders.received / cancelled / delivered: đơn nhận (gồm đã hủy), số đã hủy trong đó, đơn giao trong kỳ; "
+                    + "waiting / processing / readyForPickup là số đơn hiện đang ở Mới nhận / Đang xử lý / Hoàn thành chờ lấy "
+                    + "(không theo kỳ). revenue: giao dịch đã xác nhận có thời điểm thanh toán trong kỳ, cùng cách tính với "
+                    + "báo cáo doanh thu. alerts (không theo kỳ): lateOrders là đơn Mới nhận hoặc Đang xử lý đã quá ngày hẹn; "
+                    + "storedOrders là đơn Hoàn thành quá storedAfterDays ngày (cấu hình OVERDUE_DAYS) mà khách chưa lấy. "
+                    + "previous: số đơn nhận và tổng doanh thu của kỳ liền trước cùng số ngày."
     )
     @GetMapping("/dashboard")
     @ResponseStatus(HttpStatus.OK)
-    public DashboardResponse getDashboard() {
-        return reportService.getDashboard();
+    public DashboardResponse getDashboard(
+            @Parameter(description = "Ngày bắt đầu (yyyy-MM-dd)", example = "2026-11-10")
+            @RequestParam(required = false) String from,
+            @Parameter(description = "Ngày kết thúc (yyyy-MM-dd)", example = "2026-11-16")
+            @RequestParam(required = false) String to) {
+        return reportService.getDashboard(ReportPeriod.ofOptional(from, to));
     }
 
     @Operation(

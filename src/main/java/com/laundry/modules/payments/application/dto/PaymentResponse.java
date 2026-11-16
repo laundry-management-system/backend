@@ -18,11 +18,13 @@ public record PaymentResponse(
         PaymentStatus status,
         Long voidedBy,
         Instant voidedAt,
-        String voidReason
+        String voidReason,
+        Long shiftId
 ) {
     public static PaymentResponse from(Payment payment) {
         return new PaymentResponse(payment.getId(), payment.getOrderId(), payment.getInvoiceNo(), payment.getAmount(),
                 payment.getMethod(), payment.getPaidAt(), payment.getConfirmedBy(), payment.getReferenceCode(),
-                payment.getStatus(), payment.getVoidedBy(), payment.getVoidedAt(), payment.getVoidReason());
+                payment.getStatus(), payment.getVoidedBy(), payment.getVoidedAt(), payment.getVoidReason(),
+                payment.getShiftId());
     }
 }

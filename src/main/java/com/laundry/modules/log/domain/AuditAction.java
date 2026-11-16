@@ -17,7 +17,11 @@ public enum AuditAction {
     PRICE_CHANGE,
     SET_UP_PASSWORD,
     STATUS_ROLLBACK(true),
-    SETTING_UPDATED;
+    SETTING_UPDATED,
+    SHIFT_OPEN,
+    SHIFT_CLOSE,
+    SHIFT_CLOSE_ON_BEHALF(true),
+    SHIFT_APPROVE;
 
     private final boolean reasonRequired;
 

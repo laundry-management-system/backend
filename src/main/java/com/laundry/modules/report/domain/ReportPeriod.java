@@ -25,6 +25,25 @@ public record ReportPeriod(LocalDate from, LocalDate to) {
         return new ReportPeriod(from, to);
     }
 
+    /** Không truyền khoảng ngày → hôm nay; chỉ truyền một đầu → lỗi. */
+    public static ReportPeriod ofOptional(String rawFrom, String rawTo) {
+        boolean noFrom = rawFrom == null || rawFrom.isBlank();
+        boolean noTo = rawTo == null || rawTo.isBlank();
+        if (noFrom && noTo) {
+            return today();
+        }
+        if (noFrom || noTo) {
+            throw new BusinessException("Cần cả from và to", noFrom ? "from" : "to");
+        }
+        return of(rawFrom, rawTo);
+    }
+
+    /** Kỳ liền trước, cùng số ngày. */
+    public ReportPeriod previous() {
+        long days = ChronoUnit.DAYS.between(from, to) + 1;
+        return new ReportPeriod(from.minusDays(days), from.minusDays(1));
+    }
+
     /** Ngày hôm nay theo giờ Việt Nam. */
     public static ReportPeriod today() {
         LocalDate today = LocalDate.now(ZONE);

@@ -19,6 +19,7 @@ import com.laundry.modules.order.application.dto.IntakeOrderRequest;
 import com.laundry.modules.order.application.dto.IntakeRequest;
 import com.laundry.modules.order.application.dto.IntakeResponse;
 import com.laundry.modules.order.application.dto.OrderDetailResponse;
+import com.laundry.modules.order.application.dto.OrderFilter;
 import com.laundry.modules.order.application.dto.OrderImageDto;
 import com.laundry.modules.order.application.dto.OrderItemDto;
 import com.laundry.modules.order.application.dto.OrderReceiptResponse;
@@ -28,6 +29,7 @@ import com.laundry.modules.order.application.dto.RequestedServiceDto;
 import com.laundry.modules.order.application.dto.RescheduleOrderRequest;
 import com.laundry.modules.order.application.dto.RevertStatusRequest;
 import com.laundry.modules.order.application.dto.UpdateOrderItemsRequest;
+import com.laundry.modules.order.application.dto.WorkCountsResponse;
 import com.laundry.modules.order.domain.HistoryActionType;
 import com.laundry.modules.order.domain.ItemUnit;
 import com.laundry.modules.order.domain.Order;
@@ -393,28 +395,28 @@ public class OrderService {
     public OrderDetailResponse changeStatus(Long id, ChangeStatusRequest request, String performedBy) {
         Order order = findOrderById(id);
         order.changeStatus(request.newStatus(), request.note(), performedBy);
-        return toDetail(order);
+        return toDetail(orderRepository.saveAndFlush(order));
     }
 
     @Transactional
     public OrderDetailResponse completeOrder(Long id, CompleteOrderRequest request, String performedBy) {
         Order order = findOrderById(id);
         order.complete(request.shelfLocation(), performedBy);
-        return toDetail(order);
+        return toDetail(orderRepository.saveAndFlush(order));
     }
 
     @Transactional
     public OrderDetailResponse deliverOrder(Long id, DeliverOrderRequest request, String performedBy) {
         Order order = findOrderById(id);
         order.deliver(request.receiverName(), request.receiverRelation(), performedBy);
-        return toDetail(order);
+        return toDetail(orderRepository.saveAndFlush(order));
     }
 
     @Transactional
     public OrderDetailResponse revertStatus(Long id, RevertStatusRequest request, String performedBy) {
         Order order = findOrderById(id);
         order.revertStatus(request.targetStatus(), request.reason(), performedBy);
-        return toDetail(order);
+        return toDetail(orderRepository.saveAndFlush(order));
     }
 
     @Transactional
@@ -425,21 +427,21 @@ public class OrderService {
             throw new BusinessException("Thời gian hẹn trả mới không được để trống");
         }
         order.reschedule(targetDueAt, request.reason(), performedBy);
-        return toDetail(order);
+        return toDetail(orderRepository.saveAndFlush(order));
     }
 
     @Transactional
     public OrderDetailResponse adjustPrice(Long id, AdjustPriceRequest request, String performedBy) {
         Order order = findOrderById(id);
         order.adjustPrice(request.newTotalAmount(), request.reason(), performedBy);
-        return toDetail(order);
+        return toDetail(orderRepository.saveAndFlush(order));
     }
 
     @Transactional
     public OrderDetailResponse cancel(Long id, CancelOrderRequest request, String performedBy) {
         Order order = findOrderById(id);
         order.cancel(request.reason(), performedBy);
-        return toDetail(order);
+        return toDetail(orderRepository.saveAndFlush(order));
     }
 
     @Transactional(readOnly = true)
@@ -466,12 +468,17 @@ public class OrderService {
     }
 
     @Transactional(readOnly = true)
-    public Page<OrderResponse> getOrders(OrderStatus status, OrderPriority priority, String phone, String search, String intakeCode, Pageable pageable) {
-        String cleanPhone = (phone != null && !phone.isBlank()) ? phone.trim() : null;
-        String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
-        String cleanIntake = (intakeCode != null && !intakeCode.isBlank()) ? intakeCode.trim() : null;
-        return orderRepository.searchOrders(status, priority, cleanPhone, cleanSearch, cleanIntake, pageable)
+    public Page<OrderResponse> getOrders(OrderFilter f, Pageable pageable) {
+        List<OrderStatus> statuses = f.statuses().isEmpty() ? List.of(OrderStatus.values()) : f.statuses();
+        return orderRepository.searchOrders(f.status(), statuses, f.priority(), f.orderType(), f.classified(),
+                        f.late(), Instant.now(), f.dueStart(), f.dueEnd(), f.phone(), f.search(), f.intakeCode(), pageable)
                 .map(OrderResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public WorkCountsResponse getWorkCounts(OrderFilter f) {
+        return WorkCountsResponse.from(orderRepository.countWork(
+                Instant.now(), f.dueStart(), f.dueEnd(), f.phone(), f.search()));
     }
 
     @Transactional(readOnly = true)

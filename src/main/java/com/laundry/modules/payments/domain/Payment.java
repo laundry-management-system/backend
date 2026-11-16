@@ -67,8 +67,16 @@ public class Payment {
     @Column(name = "void_reason", length = 255)
     private String voidReason;
 
+    /** Ca đang mở lúc xác nhận thu; null với thanh toán có trước khi có tính năng ca. */
+    @Column(name = "shift_id")
+    private Long shiftId;
+
+    /** Ca đang mở lúc hủy xác nhận / hoàn tiền, có thể khác ca thu. */
+    @Column(name = "resolved_shift_id")
+    private Long resolvedShiftId;
+
     public static Payment confirmed(Long orderId, BigDecimal amount, PaymentMethod method, Instant paidAt,
-                                    Long confirmedBy, String referenceCode, String invoiceNo) {
+                                    Long confirmedBy, String referenceCode, String invoiceNo, Long shiftId) {
         Payment payment = new Payment();
         payment.orderId = orderId;
         payment.amount = amount;
@@ -77,10 +85,11 @@ public class Payment {
         payment.confirmedBy = confirmedBy;
         payment.referenceCode = referenceCode;
         payment.invoiceNo = invoiceNo;
+        payment.shiftId = shiftId;
         return payment;
     }
 
-    public void resolve(PaymentResolution resolution, Long adminId, Instant at, String reason) {
+    public void resolve(PaymentResolution resolution, Long adminId, Instant at, String reason, Long shiftId) {
         if (status != PaymentStatus.CONFIRMED) {
             throw new BusinessException("Chỉ có thể hủy hoặc hoàn một giao dịch đã xác nhận");
         }
@@ -88,5 +97,6 @@ public class Payment {
         voidedBy = adminId;
         voidedAt = at;
         voidReason = reason;
+        resolvedShiftId = shiftId;
     }
 }

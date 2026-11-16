@@ -13,6 +13,7 @@ import com.laundry.modules.order.application.dto.EstimateReturnTimeResponse;
 import com.laundry.modules.order.application.dto.IntakeRequest;
 import com.laundry.modules.order.application.dto.IntakeResponse;
 import com.laundry.modules.order.application.dto.OrderDetailResponse;
+import com.laundry.modules.order.application.dto.OrderFilter;
 import com.laundry.modules.order.application.dto.OrderImageDto;
 import com.laundry.modules.order.application.dto.OrderReceiptResponse;
 import com.laundry.modules.order.application.dto.OrderResponse;
@@ -20,8 +21,10 @@ import com.laundry.modules.order.application.dto.QuickCreateOrderRequest;
 import com.laundry.modules.order.application.dto.RescheduleOrderRequest;
 import com.laundry.modules.order.application.dto.RevertStatusRequest;
 import com.laundry.modules.order.application.dto.UpdateOrderItemsRequest;
+import com.laundry.modules.order.application.dto.WorkCountsResponse;
 import com.laundry.modules.order.domain.OrderPriority;
 import com.laundry.modules.order.domain.OrderStatus;
+import com.laundry.modules.order.domain.OrderType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -125,17 +128,46 @@ public class OrderController {
         return orderService.trackByPhone(phone);
     }
 
-    @Operation(summary = "Xem danh sách công việc & lọc đơn (UC07 / BM4)")
+    @Operation(
+            summary = "Xem danh sách công việc & lọc đơn (UC07 / BM4)",
+            description = "statuses: nhiều trạng thái, phân cách dấu phẩy. classified=false: đơn chưa có dòng đồ. "
+                    + "late=true: đơn Mới nhận / Đang xử lý đã quá hẹn. dueFrom/dueTo (yyyy-MM-dd, giờ VN, gồm cả hai đầu): "
+                    + "lọc theo ngày hẹn trả. Sắp xếp nhiều khóa: sort=dueAt,asc&sort=receivedAt,asc."
+    )
     @GetMapping
     public Page<OrderResponse> getOrders(
             @RequestParam(required = false) OrderStatus status,
+            @RequestParam(required = false) List<OrderStatus> statuses,
             @RequestParam(required = false) OrderPriority priority,
+            @RequestParam(required = false) OrderType orderType,
+            @RequestParam(required = false) Boolean classified,
+            @RequestParam(required = false) Boolean late,
+            @RequestParam(required = false) String dueFrom,
+            @RequestParam(required = false) String dueTo,
             @RequestParam(required = false) String phone,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String intakeCode,
             @PageableDefault(size = 20, sort = "dueAt", direction = Sort.Direction.ASC) Pageable pageable
     ) {
-        return orderService.getOrders(status, priority, phone, search, intakeCode, pageable);
+        OrderFilter filter = OrderFilter.of(status, statuses, priority, phone, search, intakeCode,
+                orderType, classified, late, dueFrom, dueTo);
+        return orderService.getOrders(filter, pageable);
+    }
+
+    @Operation(
+            summary = "Số đơn theo tab của Danh sách công việc",
+            description = "Đếm trên đơn Mới nhận + Đang xử lý, cùng bộ lọc từ khóa (search/phone) và ngày hẹn "
+                    + "(dueFrom/dueTo) với GET /orders. Các tab chồng nhau, không cộng thành tổng."
+    )
+    @GetMapping("/work-counts")
+    public WorkCountsResponse getWorkCounts(
+            @RequestParam(required = false) String phone,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String dueFrom,
+            @RequestParam(required = false) String dueTo
+    ) {
+        return orderService.getWorkCounts(
+                OrderFilter.of(null, null, null, phone, search, null, null, null, null, dueFrom, dueTo));
     }
 
     @Operation(summary = "Xem chi tiết đầy đủ đơn hàng (BM3, BM5)")

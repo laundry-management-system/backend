@@ -1,31 +1,37 @@
 package com.laundry.modules.report.application.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
-@Schema(description = "Dashboard trong ngày (giờ Việt Nam): số đơn, doanh thu, đơn trễ, đồ tồn")
+@Schema(description = "Dashboard theo kỳ (giờ Việt Nam): số đơn, doanh thu, đơn trễ, đồ tồn, so với kỳ liền trước")
 public record DashboardResponse(
-        @Schema(description = "Ngày của dashboard", example = "2026-11-04")
-        LocalDate date,
+        @Schema(description = "Ngày đầu kỳ", example = "2026-11-10")
+        LocalDate from,
+
+        @Schema(description = "Ngày cuối kỳ (gồm cả ngày này)", example = "2026-11-16")
+        LocalDate to,
 
         Orders orders,
 
-        @Schema(description = "Doanh thu hôm nay, cùng cách tính với báo cáo doanh thu (BM11)")
+        @Schema(description = "Doanh thu trong kỳ, cùng cách tính với báo cáo doanh thu (BM11)")
         RevenueReportResponse.Summary revenue,
 
-        Alerts alerts
+        Alerts alerts,
+
+        Previous previous
 ) {
 
     @Schema(description = "Số đơn")
     public record Orders(
-            @Schema(description = "Đơn nhận hôm nay, gồm cả đơn đã hủy")
-            long receivedToday,
+            @Schema(description = "Đơn nhận trong kỳ, gồm cả đơn đã hủy")
+            long received,
 
-            @Schema(description = "Trong số đơn nhận hôm nay, số đã hủy")
-            long cancelledToday,
+            @Schema(description = "Trong số đơn nhận trong kỳ, số đã hủy")
+            long cancelled,
 
-            @Schema(description = "Đơn giao cho khách hôm nay")
-            long deliveredToday,
+            @Schema(description = "Đơn giao cho khách trong kỳ")
+            long delivered,
 
             @Schema(description = "Số đơn hiện đang ở trạng thái Mới nhận (chưa xử lý), không giới hạn trong ngày")
             long waiting,
@@ -47,5 +53,13 @@ public record DashboardResponse(
 
             @Schema(description = "Số ngày dùng để xác định đồ tồn (cấu hình OVERDUE_DAYS)", example = "7")
             int storedAfterDays
+    ) {}
+
+    @Schema(description = "Kỳ liền trước cùng số ngày, để so sánh")
+    public record Previous(
+            LocalDate from,
+            LocalDate to,
+            @Schema(description = "Đơn nhận trong kỳ trước, gồm cả đơn đã hủy") long received,
+            @Schema(description = "Tổng doanh thu kỳ trước") BigDecimal revenueTotal
     ) {}
 }

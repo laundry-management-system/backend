@@ -23,7 +23,7 @@ public class OverdueOrderService {
         Instant now = Instant.now();
         Instant threshold = now.minus(overdueDays, ChronoUnit.DAYS);
         return orderIntegration.findOverdue(threshold).stream()
-                .map(order -> new OverdueOrderResponse(order.orderCode(), order.customerName(), order.customerPhone(),
+                .map(order -> new OverdueOrderResponse(order.id(), order.orderCode(), order.customerName(), order.customerPhone(),
                         order.completedAt(), Math.max(0, ChronoUnit.DAYS.between(order.completedAt(), now)),
                         order.notifyCount(), order.shelfLocation()))
                 .toList();

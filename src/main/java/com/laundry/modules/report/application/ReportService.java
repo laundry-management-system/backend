@@ -5,6 +5,7 @@ import com.laundry.modules.payments.application.port.OverdueDaysProvider;
 import com.laundry.modules.payments.domain.PaymentMethod;
 import com.laundry.modules.report.application.dto.DashboardResponse;
 import com.laundry.modules.report.application.dto.OrderReportResponse;
+import com.laundry.modules.report.application.dto.RevenuePaymentResponse;
 import com.laundry.modules.report.application.dto.RevenueReportResponse;
 import com.laundry.modules.report.domain.Granularity;
 import com.laundry.modules.report.domain.ReportPeriod;
@@ -41,6 +42,18 @@ public class ReportService {
     @Transactional(readOnly = true)
     public RevenueReportResponse getRevenueReport(String rawFrom, String rawTo, String rawGranularity) {
         return buildRevenueReport(ReportPeriod.of(rawFrom, rawTo), Granularity.parse(rawGranularity));
+    }
+
+    // shortcut: tối đa 1000 giao dịch, đủ cho xem chi tiết một ngày; khoảng dài cần phân trang
+    private static final int MAX_REVENUE_PAYMENTS = 1000;
+
+    /** Giao dịch tạo nên doanh thu của khoảng ngày, để đối chiếu với báo cáo. */
+    @Transactional(readOnly = true)
+    public List<RevenuePaymentResponse> getRevenuePayments(String rawFrom, String rawTo) {
+        ReportPeriod period = ReportPeriod.of(rawFrom, rawTo);
+        return reportQueryRepository.findRevenuePayments(
+                        period.startInstant(), period.endInstant(), MAX_REVENUE_PAYMENTS)
+                .stream().map(RevenuePaymentResponse::from).toList();
     }
 
     private RevenueReportResponse buildRevenueReport(ReportPeriod period, Granularity granularity) {
@@ -127,25 +140,31 @@ public class ReportService {
                 byService);
     }
 
-    /** Dashboard trong ngày (giờ Việt Nam): số đơn, doanh thu, đơn trễ, đồ tồn. */
+    /** Dashboard theo kỳ (giờ Việt Nam): số đơn, doanh thu, đơn trễ, đồ tồn, kèm kỳ liền trước để so sánh. */
     @Transactional(readOnly = true)
-    public DashboardResponse getDashboard() {
-        ReportPeriod today = ReportPeriod.today();
+    public DashboardResponse getDashboard(ReportPeriod period) {
         int storedAfterDays = overdueDaysProvider.getDays();
         Instant storedBefore = Instant.now().minus(storedAfterDays, ChronoUnit.DAYS);
 
         DashboardOrderCounts counts = reportQueryRepository.countDashboardOrders(
-                today.startInstant(), today.endInstant(), storedBefore);
-        // Dùng chung logic với BM11 để số doanh thu hôm nay luôn khớp báo cáo doanh thu
-        RevenueReportResponse.Summary revenue = buildRevenueReport(today, Granularity.DAY).summary();
+                period.startInstant(), period.endInstant(), storedBefore);
+        // Dùng chung logic với BM11 để số doanh thu luôn khớp báo cáo doanh thu
+        RevenueReportResponse.Summary revenue = buildRevenueReport(period, Granularity.DAY).summary();
+
+        ReportPeriod prev = period.previous();
+        long prevReceived = reportQueryRepository.countDashboardOrders(
+                prev.startInstant(), prev.endInstant(), storedBefore).received();
+        BigDecimal prevRevenue = buildRevenueReport(prev, Granularity.DAY).summary().total();
 
         return new DashboardResponse(
-                today.from(),
+                period.from(),
+                period.to(),
                 new DashboardResponse.Orders(
-                        counts.receivedToday(), counts.cancelledToday(), counts.deliveredToday(),
+                        counts.received(), counts.cancelled(), counts.delivered(),
                         counts.waiting(), counts.processing(), counts.readyForPickup()),
                 revenue,
-                new DashboardResponse.Alerts(counts.lateOrders(), counts.storedOrders(), storedAfterDays));
+                new DashboardResponse.Alerts(counts.lateOrders(), counts.storedOrders(), storedAfterDays),
+                new DashboardResponse.Previous(prev.from(), prev.to(), prevReceived, prevRevenue));
     }
 
     private static OrderReportResponse.ServiceRevenue toServiceRevenue(ServiceRevenueRecord r) {
