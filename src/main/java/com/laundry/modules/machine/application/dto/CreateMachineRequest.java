@@ -4,14 +4,13 @@ import com.laundry.modules.machine.domain.MachineType;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public record CreateMachineRequest(
-        @Size(max = 10, message = "Machine code must not exceed 10 characters")
-        String machineCode,
-
         @NotBlank(message = "Machine name must not be blank")
         @Size(max = 50, message = "Machine name must not exceed 50 characters")
         String name,
@@ -24,5 +23,18 @@ public record CreateMachineRequest(
         BigDecimal capacityKg,
 
         @Size(max = 255, message = "Note must not exceed 255 characters")
-        String note
+        String note,
+        @NotBlank(message = "Vui lòng nhập hãng máy")
+        @Size(max = 50, message = "Hãng máy tối đa 50 ký tự")
+        String brand,
+        @Size(max = 50, message = "Model tối đa 50 ký tự")
+        String model,
+        @Size(max = 50, message = "Số serial tối đa 50 ký tự")
+        String serialNumber,
+        @Size(max = 100, message = "Vị trí tối đa 100 ký tự")
+        String location,
+        @PastOrPresent(message = "Ngày mua không được ở tương lai")
+        LocalDate purchaseDate,
+        LocalDate warrantyUntil,
+        Long imageId
 ) {}
