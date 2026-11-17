@@ -11,6 +11,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 /** Mọi lỗi trả về cùng định dạng ProblemDetail (RFC 9457) cho FE. */
@@ -48,6 +49,15 @@ public class GlobalExceptionHandler {
         }
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, "Dữ liệu không hợp lệ");
         pd.setProperty("errors", errors);
+        return pd;
+    }
+
+    // Tham số query / path sai kiểu (enum lạ, chữ ở chỗ số) là lỗi của người gọi, không phải lỗi hệ thống
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String message = "Giá trị không hợp lệ cho tham số " + ex.getName();
+        ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, message);
+        pd.setProperty("errors", Map.of(ex.getName(), message));
         return pd;
     }
 
