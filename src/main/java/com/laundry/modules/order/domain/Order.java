@@ -121,6 +121,19 @@ public class Order extends BaseEntity {
     @Builder.Default
     private BigDecimal expressFee = BigDecimal.ZERO;
 
+    // Tổng phần trừ vào đơn của các phiếu sự cố đã duyệt, tách khỏi giảm giá voucher (QĐ4)
+    @Column(name = "incident_discount", nullable = false, precision = 12, scale = 0,
+            columnDefinition = "numeric(12,0) not null default 0")
+    @Builder.Default
+    private BigDecimal incidentDiscount = BigDecimal.ZERO;
+
+    // Điều khoản bồi thường chốt lúc tạo đơn; null = đơn tạo trước khi chốt, dùng cấu hình hiện hành
+    @Column(name = "compensation_multiplier")
+    private Integer compensationMultiplier;
+
+    @Column(name = "compensation_cap", precision = 12, scale = 0)
+    private BigDecimal compensationCap;
+
     @Column(name = "total_amount", nullable = false, precision = 12, scale = 0)
     private BigDecimal totalAmount;
 
@@ -204,7 +217,7 @@ public class Order extends BaseEntity {
         return this.intakeCode != null;
     }
 
-    /** Tổng theo QĐ5: Σ thành tiền + phụ phí nhanh + phụ phí đồ trắng − giảm giá (giảm ≤ tiền hàng). */
+    /** Tổng theo QĐ4: Σ thành tiền + phụ phí nhanh + phụ phí đồ trắng − giảm giá voucher − giảm giá sự cố (tổng hai khoản giảm ≤ tiền hàng). */
     public void recalcTotals(BigDecimal requestedDiscount) {
         BigDecimal sub = BigDecimal.ZERO;
         BigDecimal express = BigDecimal.ZERO;
@@ -216,11 +229,26 @@ public class Order extends BaseEntity {
                         .setScale(0, java.math.RoundingMode.HALF_UP));
             }
         }
-        BigDecimal discount = requestedDiscount == null ? BigDecimal.ZERO : requestedDiscount.min(sub);
+        BigDecimal incident = incidentDiscountOrZero();
+        BigDecimal discount = requestedDiscount == null ? BigDecimal.ZERO
+                : requestedDiscount.min(sub.subtract(incident)).max(BigDecimal.ZERO);
         this.subtotal = sub;
         this.expressFee = express;
         this.discountAmount = discount;
-        this.totalAmount = sub.add(express).add(this.whitesFee).subtract(discount);
+        this.totalAmount = sub.add(express).add(this.whitesFee).subtract(discount).subtract(incident)
+                .max(BigDecimal.ZERO);
+    }
+
+    public int effectiveMultiplier(int fallback) {
+        return this.compensationMultiplier != null ? this.compensationMultiplier : fallback;
+    }
+
+    public BigDecimal effectiveCap(BigDecimal fallback) {
+        return this.compensationCap != null ? this.compensationCap : fallback;
+    }
+
+    private BigDecimal incidentDiscountOrZero() {
+        return this.incidentDiscount == null ? BigDecimal.ZERO : this.incidentDiscount;
     }
 
     public void updateItems(List<OrderItem> newItems, String performedBy) {
@@ -323,6 +351,10 @@ public class Order extends BaseEntity {
         if (this.paymentStatus == PaymentStatus.PAID && !paidByZero) {
             throw new BusinessException("Đơn đã thanh toán, không áp voucher được nữa");
         }
+        if (discount != null) {
+            BigDecimal room = this.subtotal.subtract(incidentDiscountOrZero()).max(BigDecimal.ZERO);
+            discount = discount.min(room);
+        }
         String oldCode = this.voucherCode;
         this.voucherId = voucherId;
         this.voucherCode = code;
@@ -331,6 +363,31 @@ public class Order extends BaseEntity {
         this.paymentStatus = this.totalAmount.signum() == 0 ? PaymentStatus.PAID : PaymentStatus.UNPAID;
         addHistory(HistoryActionType.PRICE_ADJUST, oldCode, code,
                 code == null ? "Gỡ voucher" : "Áp voucher " + code + " giảm " + discount.toPlainString() + "đ", performedBy);
+    }
+
+    /**
+     * Trừ số tiền phiếu sự cố đã duyệt vào đơn chưa thanh toán (BR-I07); trả phần đã trừ, phần còn lại phải chi cho khách.
+     * Còn 0đ thì không có gì để thu nên coi như đã thanh toán, giống voucher.
+     */
+    public BigDecimal applyIncidentDiscount(BigDecimal amount, String incidentCode, String performedBy) {
+        if (this.paymentStatus == PaymentStatus.PAID || amount == null || amount.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal voucher = this.discountAmount == null ? BigDecimal.ZERO : this.discountAmount;
+        BigDecimal room = this.subtotal.subtract(voucher).subtract(incidentDiscountOrZero()).max(BigDecimal.ZERO);
+        BigDecimal deducted = amount.min(room);
+        if (deducted.signum() == 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal oldTotal = this.totalAmount;
+        this.incidentDiscount = incidentDiscountOrZero().add(deducted);
+        this.totalAmount = this.totalAmount.subtract(deducted).max(BigDecimal.ZERO);
+        if (this.totalAmount.signum() == 0) {
+            this.paymentStatus = PaymentStatus.PAID;
+        }
+        addHistory(HistoryActionType.PRICE_ADJUST, String.valueOf(oldTotal), String.valueOf(this.totalAmount),
+                "Giảm giá sự cố " + incidentCode + " " + deducted.toPlainString() + "đ", performedBy);
+        return deducted;
     }
 
     public void adjustPrice(BigDecimal newAmount, String reason, String performedBy) {

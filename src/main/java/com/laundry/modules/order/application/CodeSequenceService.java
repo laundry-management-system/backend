@@ -17,6 +17,7 @@ public class CodeSequenceService {
     private final CodeSequenceRepository codeSequenceRepository;
     private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final LocalDate INCIDENT_SEQ_DATE = LocalDate.of(1970, 1, 1);
 
     @Transactional(propagation = Propagation.MANDATORY)
     public String getNextOrderCode() {
@@ -29,20 +30,27 @@ public class CodeSequenceService {
         return next("INTAKE", "NH");
     }
 
+    /** Mã phiếu sự cố SC-NNNN: một bộ đếm toàn hệ thống (ngày cố định), không đặt lại theo ngày. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public String getNextIncidentCode() {
+        return String.format("SC-%04d", nextNumber("INCIDENT", INCIDENT_SEQ_DATE));
+    }
+
     private String next(String seqType, String prefix) {
         LocalDate today = LocalDate.now(VIETNAM_ZONE);
-        CodeSequence sequence = codeSequenceRepository.findBySeqTypeAndSeqDateForUpdate(seqType, today)
+        int nextNum = nextNumber(seqType, today);
+        return String.format("%s-%s-%03d", prefix, today.format(DATE_FORMATTER), nextNum);
+    }
+
+    private int nextNumber(String seqType, LocalDate date) {
+        CodeSequence sequence = codeSequenceRepository.findBySeqTypeAndSeqDateForUpdate(seqType, date)
                 .orElseGet(() -> CodeSequence.builder()
                         .seqType(seqType)
-                        .seqDate(today)
+                        .seqDate(date)
                         .lastNumber(0)
                         .build());
-
         int nextNum = sequence.increment();
         codeSequenceRepository.save(sequence);
-
-        String dateStr = today.format(DATE_FORMATTER);
-        return String.format("%s-%s-%03d", prefix, dateStr, nextNum);
+        return nextNum;
     }
 }
-

@@ -51,15 +51,22 @@ public record OrderDetailResponse(
         Boolean washWhitesSeparately,
         BigDecimal whitesFee,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        BigDecimal incidentDiscount,
+        List<String> incidentCodes,
+        Integer compensationMultiplier,
+        BigDecimal compensationCap
 ) {
     public static OrderDetailResponse from(Order order) {
         List<RequestedServiceDto> requested = order.getRequestedServiceIds() == null ? List.of()
                 : order.getRequestedServiceIds().stream().map(id -> new RequestedServiceDto(id, null, null)).toList();
-        return from(order, requested);
+        return from(order, requested, List.of(), order.getCompensationMultiplier(), order.getCompensationCap());
     }
 
-    public static OrderDetailResponse from(Order order, List<RequestedServiceDto> requestedServices) {
+    /** {@code compensationMultiplier} / {@code compensationCap}: điều khoản đã quy đổi (đơn chưa chốt thì lấy cấu hình hiện hành). */
+    public static OrderDetailResponse from(Order order, List<RequestedServiceDto> requestedServices,
+                                           List<String> incidentCodes, Integer compensationMultiplier,
+                                           BigDecimal compensationCap) {
         List<OrderItemDto> itemDtos = order.getItems() != null
                 ? order.getItems().stream().map(OrderItemDto::from).toList()
                 : List.of();
@@ -107,7 +114,11 @@ public record OrderDetailResponse(
                 order.getWashWhitesSeparately(),
                 order.getWhitesFee(),
                 order.getCreatedAt(),
-                order.getUpdatedAt()
+                order.getUpdatedAt(),
+                order.getIncidentDiscount(),
+                incidentCodes,
+                compensationMultiplier,
+                compensationCap
         );
     }
 }

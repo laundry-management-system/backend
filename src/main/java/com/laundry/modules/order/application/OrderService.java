@@ -34,6 +34,7 @@ import com.laundry.modules.order.application.dto.WorkCountsResponse;
 import com.laundry.modules.order.domain.HistoryActionType;
 import com.laundry.modules.order.domain.ItemUnit;
 import com.laundry.modules.order.domain.Order;
+import com.laundry.modules.order.domain.OrderIncidentQuery;
 import com.laundry.modules.order.domain.OrderImage;
 import com.laundry.modules.order.domain.OrderImageRepository;
 import com.laundry.modules.order.domain.OrderItem;
@@ -81,6 +82,7 @@ public class OrderService {
     private final SettingService settingService;
     private final DocumentService documentService;
     private final VoucherService voucherService;
+    private final OrderIncidentQuery orderIncidentQuery;
 
     /**
      * Tạo một lượt nhận (1–2 đơn) trong một transaction. Dịch vụ chọn ở quầy chỉ lưu làm tham khảo:
@@ -101,11 +103,16 @@ public class OrderService {
                 request.customerPhone(), request.customerName(), performedBy);
         String intakeCode = codeSequenceService.getNextIntakeCode();
 
+        // Điều khoản bồi thường chốt theo đơn lúc tạo, in trên phiếu nhận (BR-I04)
+        int compensationMultiplier = settingService.getCompensationMultiplier();
+        BigDecimal compensationCap = settingService.getCompensationCap();
         List<Order> created = request.orders().stream().map(o -> {
             String serviceNames = o.serviceIds().stream().map(id -> services.get(id).getName())
                     .collect(Collectors.joining(", "));
             Order order = Order.builder()
                     .orderCode(codeSequenceService.getNextOrderCode())
+                    .compensationMultiplier(compensationMultiplier)
+                    .compensationCap(compensationCap)
                     .intakeCode(intakeCode)
                     .intakeRequestId(request.requestId())
                     .customerId(customerId)
@@ -182,7 +189,7 @@ public class OrderService {
 
     private OrderDetailResponse toDetail(Order order) {
         List<Long> ids = order.getRequestedServiceIds();
-        if (ids == null || ids.isEmpty()) return OrderDetailResponse.from(order, List.of());
+        if (ids == null || ids.isEmpty()) return withIncidents(order, List.of());
         Map<Long, LaundryService> byId = laundryServiceRepository.findAllById(ids).stream()
                 .collect(Collectors.toMap(LaundryService::getId, Function.identity()));
         List<RequestedServiceDto> requested = ids.stream().map(id -> {
@@ -190,7 +197,13 @@ public class OrderService {
             return svc == null ? new RequestedServiceDto(id, null, null)
                     : new RequestedServiceDto(id, svc.getName(), ItemUnit.valueOf(svc.getUnit().name()));
         }).toList();
-        return OrderDetailResponse.from(order, requested);
+        return withIncidents(order, requested);
+    }
+
+    private OrderDetailResponse withIncidents(Order order, List<RequestedServiceDto> requested) {
+        return OrderDetailResponse.from(order, requested, orderIncidentQuery.deductedCodes(order.getId()),
+                order.effectiveMultiplier(settingService.getCompensationMultiplier()),
+                order.effectiveCap(settingService.getCompensationCap()));
     }
 
     @Transactional
@@ -227,6 +240,8 @@ public class OrderService {
 
         Order order = Order.builder()
                 .orderCode(orderCode)
+                .compensationMultiplier(settingService.getCompensationMultiplier())
+                .compensationCap(settingService.getCompensationCap())
                 .customerName(request.customerName().trim())
                 .customerPhone(request.customerPhone().trim())
                 .createdBy(performedBy)
@@ -263,7 +278,11 @@ public class OrderService {
     public OrderReceiptResponse getReceipt(Long id, String webBaseUrl) {
         Order order = findOrderById(id);
         order.markReceiptPrinted();
-        if (!order.isIntakeV3()) return OrderReceiptResponse.from(order, webBaseUrl);
+        if (!order.isIntakeV3()) {
+            return OrderReceiptResponse.from(order, webBaseUrl, 1, 1, order.getWhitesFee(), List.of(),
+                    order.effectiveMultiplier(settingService.getCompensationMultiplier()),
+                    order.effectiveCap(settingService.getCompensationCap()));
+        }
 
         List<Order> intake = orderRepository.findByIntakeCode(order.getIntakeCode()).stream()
                 .sorted(Comparator.comparing((Order o) -> o.getOrderType() != OrderType.NORMAL))
@@ -280,7 +299,9 @@ public class OrderService {
         // Chưa phân loại thì phí đồ trắng chưa chốt: in mức hiện hành để tham khảo
         BigDecimal whitesFee = !Boolean.TRUE.equals(order.getWashWhitesSeparately()) ? BigDecimal.ZERO
                 : order.getItems().isEmpty() ? settingService.getWhitesFee() : order.getWhitesFee();
-        return OrderReceiptResponse.from(order, webBaseUrl, Math.max(index, 1), Math.max(intake.size(), 1), whitesFee, lines);
+        return OrderReceiptResponse.from(order, webBaseUrl, Math.max(index, 1), Math.max(intake.size(), 1), whitesFee, lines,
+                order.effectiveMultiplier(settingService.getCompensationMultiplier()),
+                order.effectiveCap(settingService.getCompensationCap()));
     }
 
     @Transactional

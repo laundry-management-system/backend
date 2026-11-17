@@ -38,6 +38,9 @@ VALUES (0, 'NV00', 'system', '0000000000', 'system@gmail.com', 'system',
         'ADMIN', 'INACTIVE', CURRENT_DATE, NOW(), NOW())
 ON CONFLICT (username) DO NOTHING;
 
+-- Điều khoản bồi thường dạng chữ đã thay bằng hệ số K + mức trần; dòng cũ làm enum SettingKey không đọc được
+DELETE FROM settings WHERE setting_key = 'COMPENSATION_TERMS';
+
 INSERT INTO settings (setting_key, setting_value, description, updated_by, updated_at)
 VALUES
     ('MAX_LOGIN_FAIL', '5', 'Số lần đăng nhập sai tối đa trước khi bị khóa', NULL, NOW()),
@@ -51,7 +54,8 @@ VALUES
     ('BANK_ACCOUNT_NO', '0000000000', 'Số tài khoản ngân hàng nhận thanh toán', NULL, NOW()),
     ('BANK_ACCOUNT_NAME', 'CHU TIEM GIAT UI', 'Tên chủ tài khoản ngân hàng nhận thanh toán', NULL, NOW()),
 
-    ('COMPENSATION_TERMS', '100000', 'Mức bồi thường mặc định khi xảy ra sự cố làm mất hoặc hư hỏng đồ', NULL, NOW()),
+    ('COMPENSATION_MULTIPLIER', '10', 'Hệ số bồi thường K: tối đa K lần giá dịch vụ của món', NULL, NOW()),
+    ('COMPENSATION_CAP_PER_ITEM', '500000', 'Mức trần bồi thường mỗi món (đ)', NULL, NOW()),
     ('STORAGE_DAYS', '30', 'Số ngày lưu trữ đồ sau khi hoàn thành đơn hàng', NULL, NOW()),
 
     ('STORE_NAME', 'Laundry Shop', 'Tên cửa hàng giặt ủi', NULL, NOW()),

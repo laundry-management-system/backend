@@ -38,7 +38,9 @@ public record OrderReceiptResponse(
         Boolean washWhitesSeparately,
         BigDecimal whitesFee,
         String createdBy,
-        List<ReceiptServiceLine> services
+        List<ReceiptServiceLine> services,
+        Integer compensationMultiplier,
+        BigDecimal compensationCap
 ) {
     /** Dịch vụ tham khảo kèm giá hiện hành (giá tham khảo, chưa chốt). */
     public record ReceiptServiceLine(String name, ItemUnit unit, BigDecimal unitPrice,
@@ -46,11 +48,13 @@ public record OrderReceiptResponse(
     }
 
     public static OrderReceiptResponse from(Order order, String webBaseUrl) {
-        return from(order, webBaseUrl, 1, 1, order.getWhitesFee(), List.of());
+        return from(order, webBaseUrl, 1, 1, order.getWhitesFee(), List.of(),
+                order.getCompensationMultiplier(), order.getCompensationCap());
     }
 
     public static OrderReceiptResponse from(Order order, String webBaseUrl, int intakeOrderIndex, int intakeOrderCount,
-                                            BigDecimal whitesFee, List<ReceiptServiceLine> services) {
+                                            BigDecimal whitesFee, List<ReceiptServiceLine> services,
+                                            Integer compensationMultiplier, BigDecimal compensationCap) {
         String base = (webBaseUrl != null && !webBaseUrl.isBlank()) ? webBaseUrl : "http://localhost:5173";
         String trackingQrUrl = base + "/track?phone=" + order.getCustomerPhone();
 
@@ -80,7 +84,9 @@ public record OrderReceiptResponse(
                 order.getWashWhitesSeparately(),
                 whitesFee,
                 order.getCreatedBy(),
-                services
+                services,
+                compensationMultiplier,
+                compensationCap
         );
     }
 }

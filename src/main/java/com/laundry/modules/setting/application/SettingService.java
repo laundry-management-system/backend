@@ -96,6 +96,16 @@ public class SettingService {
     }
 
     @Transactional(readOnly = true)
+    public int getCompensationMultiplier() {
+        return getValue(SettingKey.COMPENSATION_MULTIPLIER, Integer.class);
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal getCompensationCap() {
+        return BigDecimal.valueOf(getValue(SettingKey.COMPENSATION_CAP_PER_ITEM, Integer.class));
+    }
+
+    @Transactional(readOnly = true)
     public List<SettingResponse> getSettings(){
         return settingRepository.findAll()
                 .stream()
