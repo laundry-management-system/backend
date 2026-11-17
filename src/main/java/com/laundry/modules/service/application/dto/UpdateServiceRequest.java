@@ -34,5 +34,9 @@ public record UpdateServiceRequest(
         Boolean whitesApplicable,
 
         // Tùy chọn: đổi trạng thái cùng lúc với thông tin, khỏi gọi thêm PATCH /status
-        ServiceStatus status
+        ServiceStatus status,
+
+        // Bắt buộc khi đổi đơn giá, phụ phí, thời gian xử lý hoặc trạng thái; AuditLogService kiểm tra
+        @Size(max = 500, message = "Lý do không được vượt quá 500 ký tự")
+        String priceChangeReason
 ) {}

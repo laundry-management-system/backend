@@ -15,7 +15,7 @@ public enum AuditAction {
     PAYMENT_CONFIRM,
     PAYMENT_VOID(true),
     PAYMENT_REFUND(true),
-    PRICE_CHANGE,
+    PRICE_CHANGE(true),
     SET_UP_PASSWORD,
     STATUS_ROLLBACK(true),
     SETTING_UPDATED,
