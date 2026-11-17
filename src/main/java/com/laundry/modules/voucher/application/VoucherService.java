@@ -118,24 +118,9 @@ public class VoucherService {
             return VoucherValidationResponse.invalid(cleanCode, "Voucher code '" + cleanCode + "' not found");
         }
 
-        if (!voucher.isActive()) {
-            return VoucherValidationResponse.invalid(cleanCode, "Voucher '" + cleanCode + "' is disabled (BR-G05)");
-        }
-
-        LocalDate today = LocalDate.now();
-        if (today.isBefore(voucher.getStartDate())) {
-            return VoucherValidationResponse.invalid(cleanCode, "Voucher '" + cleanCode + "' is not yet active (effective from " + voucher.getStartDate() + ") (BR-G01)");
-        }
-        if (today.isAfter(voucher.getEndDate())) {
-            return VoucherValidationResponse.invalid(cleanCode, "Voucher '" + cleanCode + "' has expired on " + voucher.getEndDate() + " (BR-G01)");
-        }
-
-        if (!voucher.hasAvailableUses()) {
-            return VoucherValidationResponse.invalid(cleanCode, "Voucher '" + cleanCode + "' has reached its usage limit (" + voucher.getMaxUses() + ") (BR-G03)");
-        }
-
-        if (!voucher.satisfiesMinOrderValue(orderValue)) {
-            return VoucherValidationResponse.invalid(cleanCode, "Order total (" + orderValue + ") does not meet the minimum requirement of " + voucher.getMinOrderValue() + " (BR-G02)");
+        String reason = voucher.rejectionReason(orderValue, LocalDate.now(), true);
+        if (reason != null) {
+            return VoucherValidationResponse.invalid(cleanCode, reason);
         }
 
         BigDecimal discountAmount = voucher.calculateDiscount(orderValue);
@@ -157,14 +142,34 @@ public class VoucherService {
         return VoucherResponse.from(saved);
     }
 
+    /**
+     * Áp voucher cho đơn khi lưu phân loại: kiểm tra, tính tiền giảm trên tiền hàng và giữ một lượt.
+     * Đơn đang giữ lượt của chính voucher này thì không tính thêm lượt; đổi sang mã khác thì trả lượt mã cũ.
+     */
+    @Transactional
+    public AppliedVoucher applyToOrder(String code, BigDecimal orderValue, Long currentVoucherId) {
+        String cleanCode = code.trim().toUpperCase();
+        Voucher voucher = voucherRepository.lockByCode(cleanCode)
+                .orElseThrow(() -> new BusinessException("Voucher code '" + cleanCode + "' not found", "voucherCode"));
+        boolean alreadyHeld = voucher.getId().equals(currentVoucherId);
+        String reason = voucher.rejectionReason(orderValue, LocalDate.now(), !alreadyHeld);
+        if (reason != null) {
+            throw new BusinessException(reason, "voucherCode");
+        }
+        if (!alreadyHeld) {
+            releaseVoucher(currentVoucherId);
+            voucher.incrementUsedCount();
+        }
+        return new AppliedVoucher(voucher.getId(), voucher.getCode(), voucher.calculateDiscount(orderValue));
+    }
+
+    public record AppliedVoucher(Long voucherId, String code, BigDecimal discountAmount) {}
+
     @Transactional
     public void releaseVoucher(Long voucherId) {
         if (voucherId == null) {
             return;
         }
-        voucherRepository.findById(voucherId).ifPresent(voucher -> {
-            voucher.decrementUsedCount();
-            voucherRepository.save(voucher);
-        });
+        voucherRepository.lockById(voucherId).ifPresent(Voucher::decrementUsedCount);
     }
 }

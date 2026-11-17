@@ -41,13 +41,21 @@ public class DeliveryService {
         Payment confirmedPayment = paymentRepository.findByOrderIdOrderByCreatedAtDesc(order.id()).stream()
                 .filter(payment -> payment.getStatus() == PaymentStatus.CONFIRMED)
                 .findFirst()
-                .orElseThrow(() -> new BusinessException("Đơn đang ở trạng thái đã thanh toán nhưng thiếu giao dịch"));
+                .orElse(null);
+        // Voucher giảm hết tiền: đơn tự PAID mà không có giao dịch (giao dịch phải > 0)
+        boolean nothingToPay = order.totalAmount() != null && order.totalAmount().signum() <= 0;
+        if (confirmedPayment == null && !nothingToPay) {
+            throw new BusinessException("Đơn đang ở trạng thái đã thanh toán nhưng thiếu giao dịch");
+        }
         Instant deliveredAt = Instant.now();
         orderIntegration.deliver(order.id(), deliveredAt, username, receiverName, receiverRelation);
 
         return new DeliveryResponse(order.orderCode(), order.customerName(), order.customerPhone(), order.dueAt(),
-                order.totalAmount(), confirmedPayment.getInvoiceNo(), confirmedPayment.getMethod(),
-                confirmedPayment.getPaidAt(), "DELIVERED", deliveredAt, username, receiverName, receiverRelation);
+                order.totalAmount(),
+                confirmedPayment != null ? confirmedPayment.getInvoiceNo() : null,
+                confirmedPayment != null ? confirmedPayment.getMethod() : null,
+                confirmedPayment != null ? confirmedPayment.getPaidAt() : null,
+                "DELIVERED", deliveredAt, username, receiverName, receiverRelation);
     }
 
     private static String normalize(String value) {

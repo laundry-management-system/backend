@@ -3,6 +3,7 @@ package com.laundry.modules.order.presentation;
 import com.laundry.modules.order.application.OrderService;
 import com.laundry.modules.order.application.dto.AddOrderItemImageRequest;
 import com.laundry.modules.order.application.dto.AdjustPriceRequest;
+import com.laundry.modules.order.application.dto.ApplyOrderVoucherRequest;
 import com.laundry.modules.order.application.dto.CancelOrderRequest;
 import com.laundry.modules.order.application.dto.ChangeStatusRequest;
 import com.laundry.modules.order.application.dto.CompleteOrderRequest;
@@ -109,6 +110,16 @@ public class OrderController {
     ) {
         String staff = getUsername(authentication);
         return orderService.updateItems(id, request, staff);
+    }
+
+    @Operation(summary = "Áp / đổi / gỡ voucher ở bước thanh toán (đơn đã hoàn thành, chưa thu tiền)")
+    @PutMapping("/{id}/voucher")
+    public OrderDetailResponse applyVoucher(
+            @PathVariable Long id,
+            @Valid @RequestBody ApplyOrderVoucherRequest request,
+            Authentication authentication
+    ) {
+        return orderService.applyVoucher(id, request, getUsername(authentication));
     }
 
     @Operation(summary = "Đính kèm ảnh tình trạng món đồ có vấn đề (ố, rách - UC04 extend)")

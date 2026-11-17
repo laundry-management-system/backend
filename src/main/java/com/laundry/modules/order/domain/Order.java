@@ -64,6 +64,9 @@ public class Order extends BaseEntity {
     @Column(name = "voucher_id")
     private Long voucherId;
 
+    @Column(name = "voucher_code", length = 20)
+    private String voucherCode;
+
     // Lượt nhận v3: null = đơn tạo trước tiếp nhận v3
     @Column(name = "intake_code", length = 20)
     private String intakeCode;
@@ -305,6 +308,29 @@ public class Order extends BaseEntity {
         Instant oldDueAt = this.dueAt;
         this.dueAt = newDueAt;
         addHistory(HistoryActionType.RESCHEDULE, String.valueOf(oldDueAt), String.valueOf(newDueAt), reason, performedBy);
+    }
+
+    /**
+     * Áp / đổi / gỡ voucher ở bước thanh toán: thay tiền giảm cũ bằng tiền giảm mới, giữ các điều chỉnh giá khác.
+     * Còn 0đ thì không có gì để thu nên coi như đã thanh toán; gỡ voucher thì trở lại chưa thanh toán.
+     */
+    public void applyVoucher(Long voucherId, String code, BigDecimal discount, String performedBy) {
+        if (this.status != OrderStatus.COMPLETED) {
+            throw new BusinessException("Chỉ áp voucher khi thanh toán đơn đã hoàn thành");
+        }
+        BigDecimal oldDiscount = this.discountAmount == null ? BigDecimal.ZERO : this.discountAmount;
+        boolean paidByZero = this.paymentStatus == PaymentStatus.PAID && this.totalAmount.signum() == 0 && oldDiscount.signum() > 0;
+        if (this.paymentStatus == PaymentStatus.PAID && !paidByZero) {
+            throw new BusinessException("Đơn đã thanh toán, không áp voucher được nữa");
+        }
+        String oldCode = this.voucherCode;
+        this.voucherId = voucherId;
+        this.voucherCode = code;
+        this.discountAmount = discount;
+        this.totalAmount = this.totalAmount.add(oldDiscount).subtract(discount).max(BigDecimal.ZERO);
+        this.paymentStatus = this.totalAmount.signum() == 0 ? PaymentStatus.PAID : PaymentStatus.UNPAID;
+        addHistory(HistoryActionType.PRICE_ADJUST, oldCode, code,
+                code == null ? "Gỡ voucher" : "Áp voucher " + code + " giảm " + discount.toPlainString() + "đ", performedBy);
     }
 
     public void adjustPrice(BigDecimal newAmount, String reason, String performedBy) {

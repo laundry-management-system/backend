@@ -94,6 +94,29 @@ public class Voucher extends BaseEntity {
         }
     }
 
+    /**
+     * Lý do không áp được voucher cho đơn (null nếu áp được), cùng thứ tự kiểm tra với màn phân loại.
+     * {@code needsFreeUse = false} khi đơn đã giữ lượt của voucher này (lưu phân loại lần nữa).
+     */
+    public String rejectionReason(BigDecimal orderValue, LocalDate today, boolean needsFreeUse) {
+        if (!isActive()) {
+            return "Voucher '" + code + "' is disabled (BR-G05)";
+        }
+        if (today.isBefore(startDate)) {
+            return "Voucher '" + code + "' is not yet active (effective from " + startDate + ") (BR-G01)";
+        }
+        if (today.isAfter(endDate)) {
+            return "Voucher '" + code + "' has expired on " + endDate + " (BR-G01)";
+        }
+        if (needsFreeUse && !hasAvailableUses()) {
+            return "Voucher '" + code + "' has reached its usage limit (" + maxUses + ") (BR-G03)";
+        }
+        if (!satisfiesMinOrderValue(orderValue)) {
+            return "Order total (" + orderValue + ") does not meet the minimum requirement of " + minOrderValue + " (BR-G02)";
+        }
+        return null;
+    }
+
     public boolean isActive() {
         return this.status == VoucherStatus.ACTIVE;
     }

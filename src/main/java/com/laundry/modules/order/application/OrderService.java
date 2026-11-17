@@ -8,6 +8,7 @@ import com.laundry.modules.document.application.dto.DocumentResponse;
 import com.laundry.modules.document.domain.Document;
 import com.laundry.modules.order.application.dto.AddOrderItemImageRequest;
 import com.laundry.modules.order.application.dto.AdjustPriceRequest;
+import com.laundry.modules.order.application.dto.ApplyOrderVoucherRequest;
 import com.laundry.modules.order.application.dto.CancelOrderRequest;
 import com.laundry.modules.order.application.dto.ChangeStatusRequest;
 import com.laundry.modules.order.application.dto.CompleteOrderRequest;
@@ -47,6 +48,7 @@ import com.laundry.modules.service.domain.LaundryService;
 import com.laundry.modules.service.domain.LaundryServiceRepository;
 import com.laundry.modules.service.domain.ServiceStatus;
 import com.laundry.modules.setting.application.SettingService;
+import com.laundry.modules.voucher.application.VoucherService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
@@ -78,6 +80,7 @@ public class OrderService {
     private final LaundryServiceRepository laundryServiceRepository;
     private final SettingService settingService;
     private final DocumentService documentService;
+    private final VoucherService voucherService;
 
     /**
      * Tạo một lượt nhận (1–2 đơn) trong một transaction. Dịch vụ chọn ở quầy chỉ lưu làm tham khảo:
@@ -366,6 +369,23 @@ public class OrderService {
         return toDetail(orderRepository.saveAndFlush(order));
     }
 
+    /** Voucher chỉ áp ở bước thanh toán, tính trên tiền hàng; giữ / đổi / trả lượt theo voucher đơn đang giữ. */
+    @Transactional
+    public OrderDetailResponse applyVoucher(Long id, ApplyOrderVoucherRequest request, String performedBy) {
+        Order order = orderRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy đơn hàng với ID: " + id));
+        String code = request.voucherCode();
+        if (code == null || code.isBlank()) {
+            if (order.getVoucherId() == null) return toDetail(order);
+            voucherService.releaseVoucher(order.getVoucherId());
+            order.applyVoucher(null, null, BigDecimal.ZERO, performedBy);
+        } else {
+            VoucherService.AppliedVoucher applied = voucherService.applyToOrder(code, order.getSubtotal(), order.getVoucherId());
+            order.applyVoucher(applied.voucherId(), applied.code(), applied.discountAmount(), performedBy);
+        }
+        return toDetail(orderRepository.saveAndFlush(order));
+    }
+
     @Transactional
     public OrderImageDto addOrderItemImage(Long orderId, Long itemId, AddOrderItemImageRequest request) {
         findOrderById(orderId);
@@ -441,6 +461,7 @@ public class OrderService {
     public OrderDetailResponse cancel(Long id, CancelOrderRequest request, String performedBy) {
         Order order = findOrderById(id);
         order.cancel(request.reason(), performedBy);
+        voucherService.releaseVoucher(order.getVoucherId());
         return toDetail(orderRepository.saveAndFlush(order));
     }
 
