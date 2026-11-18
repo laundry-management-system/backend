@@ -41,6 +41,11 @@ ON CONFLICT (username) DO NOTHING;
 -- Điều khoản bồi thường dạng chữ đã thay bằng hệ số K + mức trần; dòng cũ làm enum SettingKey không đọc được
 DELETE FROM settings WHERE setting_key = 'COMPENSATION_TERMS';
 
+-- ddl-auto không cập nhật CHECK của enum cũ; bỏ nếu có để thêm STORE_PHONE, SERVICE_AREA_MANAGE, SERVICE_AREA
+ALTER TABLE settings   DROP CONSTRAINT IF EXISTS settings_setting_key_check;
+ALTER TABLE audit_logs DROP CONSTRAINT IF EXISTS audit_logs_action_check;
+ALTER TABLE audit_logs DROP CONSTRAINT IF EXISTS audit_logs_entity_type_check;
+
 INSERT INTO settings (setting_key, setting_value, description, updated_by, updated_at)
 VALUES
     ('MAX_LOGIN_FAIL', '5', 'Số lần đăng nhập sai tối đa trước khi bị khóa', NULL, NOW()),
@@ -60,6 +65,7 @@ VALUES
 
     ('STORE_NAME', 'Laundry Shop', 'Tên cửa hàng giặt ủi', NULL, NOW()),
     ('STORE_ADDRESS', 'Chưa cập nhật', 'Địa chỉ cửa hàng giặt ủi', NULL, NOW()),
+    ('STORE_PHONE', '', 'Số điện thoại cửa hàng (10 chữ số, bắt đầu bằng 0)', NULL, NOW()),
 
     ('WHITES_FEE', '80000', 'Phụ phí giặt riêng đồ trắng (đ/đơn)', NULL, NOW()),
 
@@ -70,3 +76,6 @@ ON CONFLICT (setting_key) DO NOTHING;
 CREATE UNIQUE INDEX IF NOT EXISTS uk_shifts_one_open ON shifts ((true)) WHERE status = 'OPEN';
 CREATE INDEX IF NOT EXISTS idx_payments_shift ON payments (shift_id);
 CREATE INDEX IF NOT EXISTS idx_payments_resolved_shift ON payments (resolved_shift_id);
+
+-- Tên khu vực không trùng, không phân biệt hoa thường; chặn cả khi hai Admin thêm cùng lúc (FR-029e)
+CREATE UNIQUE INDEX IF NOT EXISTS uk_service_areas_name_ci ON service_areas (lower(name));

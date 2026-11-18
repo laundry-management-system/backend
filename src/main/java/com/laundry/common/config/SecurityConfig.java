@@ -52,6 +52,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(PUBLIC_PATHS).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/public/store", "/api/public/services", "/api/public/service-areas").permitAll()
                         .anyRequest().authenticated())
                 // Lỗi ở tầng filter không tới được @RestControllerAdvice, nên tự trả ProblemDetail
                 .exceptionHandling(e -> e

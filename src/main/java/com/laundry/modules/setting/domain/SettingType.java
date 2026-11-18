@@ -41,6 +41,18 @@ public enum SettingType {
         public Object parse(String raw) {
             return LocalTime.parse(raw.trim(), DateTimeFormatter.ofPattern("HH:mm"));
         }
+    },
+
+    /** Rỗng (chưa nhập) hoặc 10 chữ số bắt đầu bằng 0. */
+    PHONE("số điện thoại 10 chữ số, bắt đầu bằng 0") {
+        @Override
+        public Object parse(String raw) {
+            String value = raw.trim();
+            if (!value.isEmpty() && !value.matches("^0\\d{9}$")) {
+                throw new IllegalArgumentException("Số điện thoại không hợp lệ");
+            }
+            return value;
+        }
     };
 
     private final String hint;

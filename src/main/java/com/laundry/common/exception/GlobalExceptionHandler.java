@@ -8,6 +8,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -66,6 +67,12 @@ public class GlobalExceptionHandler {
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, "File tối đa 5MB");
         pd.setProperty("errors", Map.of("file", "File tối đa 5MB"));
         return pd;
+    }
+
+    // Gọi sai method (vd DELETE khi API không hỗ trợ) là lỗi của người gọi, không phải lỗi hệ thống
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ProblemDetail handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        return problem(HttpStatus.METHOD_NOT_ALLOWED, "Phương thức không được hỗ trợ");
     }
 
     @ExceptionHandler(AuthenticationException.class)
