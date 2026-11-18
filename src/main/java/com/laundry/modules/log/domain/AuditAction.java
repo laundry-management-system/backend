@@ -23,7 +23,8 @@ public enum AuditAction {
     SHIFT_CLOSE,
     SHIFT_CLOSE_ON_BEHALF(true),
     SHIFT_APPROVE,
-    SERVICE_AREA_MANAGE;
+    SERVICE_AREA_MANAGE,
+    CUSTOMER_ACCOUNT;
 
     private final boolean reasonRequired;
 

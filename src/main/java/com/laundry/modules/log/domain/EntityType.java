@@ -12,5 +12,6 @@ public enum EntityType {
     VOUCHER,
     INCIDENT,
     SHIFT,
-    SERVICE_AREA
+    SERVICE_AREA,
+    CUSTOMER_REGISTRATION
 }

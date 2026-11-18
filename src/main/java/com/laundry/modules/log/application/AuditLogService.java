@@ -3,6 +3,7 @@ package com.laundry.modules.log.application;
 import com.laundry.common.exception.BusinessException;
 import com.laundry.common.exception.NotFoundException;
 import com.laundry.common.security.ClientInfo;
+import com.laundry.common.security.JwtUtil;
 import com.laundry.modules.auth.domain.User;
 import com.laundry.modules.auth.domain.UserRepository;
 import com.laundry.modules.log.application.dto.AuditEntry;
@@ -12,6 +13,7 @@ import com.laundry.modules.log.domain.AuditLog;
 import com.laundry.modules.log.domain.AuditLogFilter;
 import com.laundry.modules.log.domain.AuditLogRepository;
 import com.laundry.modules.log.domain.AuditLogSpecs;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -83,8 +85,19 @@ public class AuditLogService {
      * Có xác thực: lấy id người dùng; không tìm thấy thì báo lỗi, KHÔNG ghi tạm dưới tên system.
      * Không có xác thực (public, webhook, hệ thống tự chạy): dùng tài khoản system.
      */
+    /** Ghi nhật ký thao tác của khách: bảng nhật ký chỉ trỏ được tới nhân viên nên lưu kèm mã khách. */
+    @Transactional
+    public void logAsCustomer(AuditEntry entry, String customerCode) {
+        Map<String, Object> newData = new HashMap<>();
+        if (entry.newData() != null) newData.putAll(entry.newData());
+        newData.put("actorCustomerCode", customerCode);
+        log(new AuditEntry(entry.action(), entry.entityType(), entry.entityId(), entry.oldData(), newData, entry.reason()));
+    }
+
     private Long resolveActorId() {
         return clientInfo.currentUsername()
+                // Phiên khách không có dòng trong bảng users: ghi dưới tài khoản system
+                .filter(username -> !JwtUtil.isCustomerSubject(username))
                 .map(username -> userRepository.findIdByUsername(username)
                         .orElseThrow(() -> new IllegalStateException(
                                 "Người dùng đã xác thực nhưng không có trong DB: " + username)))

@@ -64,6 +64,9 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import com.laundry.modules.order.application.dto.CustomerPortalOrderResponse;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -515,6 +518,13 @@ public class OrderService {
         return orderRepository.searchOrders(f.status(), statuses, f.priority(), f.orderType(), f.classified(),
                         f.late(), Instant.now(), f.dueStart(), f.dueEnd(), f.phone(), f.search(), f.intakeCode(), pageable)
                 .map(OrderResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<CustomerPortalOrderResponse> listForCustomer(Long customerId, int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, 50),
+                Sort.by(Sort.Direction.DESC, "receivedAt").and(Sort.by(Sort.Direction.DESC, "id")));
+        return orderRepository.findByCustomerId(customerId, pageable).map(CustomerPortalOrderResponse::from);
     }
 
     @Transactional(readOnly = true)

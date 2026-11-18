@@ -79,3 +79,15 @@ CREATE INDEX IF NOT EXISTS idx_payments_resolved_shift ON payments (resolved_shi
 
 -- Tên khu vực không trùng, không phân biệt hoa thường; chặn cả khi hai Admin thêm cùng lúc (FR-029e)
 CREATE UNIQUE INDEX IF NOT EXISTS uk_service_areas_name_ci ON service_areas (lower(name));
+
+-- Tài khoản khách: hồ sơ cũ là do nhân viên tạo; enum lưu dạng chuỗi nên bỏ CHECK để thêm giá trị sau không vỡ
+UPDATE customers SET source = 'COUNTER' WHERE source IS NULL;
+ALTER TABLE customers DROP CONSTRAINT IF EXISTS customers_source_check;
+ALTER TABLE customer_registrations DROP CONSTRAINT IF EXISTS customer_registrations_status_check;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_customers_email_ci ON customers (lower(email)) WHERE email IS NOT NULL;
+-- Chỉ yêu cầu đang chờ mới giữ SĐT/email; yêu cầu bị từ chối thì đăng ký lại được
+CREATE UNIQUE INDEX IF NOT EXISTS uk_customer_registrations_pending_phone ON customer_registrations (phone) WHERE status = 'PENDING';
+CREATE UNIQUE INDEX IF NOT EXISTS uk_customer_registrations_pending_email ON customer_registrations (lower(email)) WHERE status = 'PENDING' AND email IS NOT NULL;
+-- Yêu cầu chờ tạo trước khi hồ sơ được gắn lúc đăng ký: gắn vào hồ sơ cùng SĐT
+UPDATE customer_registrations r SET customer_id = c.id FROM customers c
+    WHERE r.status = 'PENDING' AND r.customer_id IS NULL AND c.phone = r.phone;

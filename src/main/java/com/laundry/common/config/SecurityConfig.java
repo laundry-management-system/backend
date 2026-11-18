@@ -28,6 +28,7 @@ public class SecurityConfig {
     private static final String[] PUBLIC_PATHS = {
             "/api/health",
             "/api/auth/**",
+            "/api/customer-auth/**",
             "/api/public/orders/lookup",
             "/api/users/setup-password",
             "/api/orders/track",
@@ -53,7 +54,9 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(PUBLIC_PATHS).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/public/store", "/api/public/services", "/api/public/service-areas").permitAll()
-                        .anyRequest().authenticated())
+                        .requestMatchers("/api/customer-portal/**").hasRole("CUSTOMER")
+                        // Phần lớn controller quản trị không có @PreAuthorize nên phải chặn token khách ở đây
+                        .anyRequest().hasAnyRole("ADMIN", "STAFF"))
                 // Lỗi ở tầng filter không tới được @RestControllerAdvice, nên tự trả ProblemDetail
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint((req, res, ex) ->

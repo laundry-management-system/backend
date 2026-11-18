@@ -59,6 +59,7 @@ app:
   frontend:
     setup-password-url: ${SETUP_PASSWORD_URL} # TODO: Gắn link trang nhập mật khẩu vào biến
     public-lookup-url: ${PUBLIC_LOOKUP_URL:http://localhost:5173/track-order}
+    customer-reset-password-url: ${CUSTOMER_RESET_PASSWORD_URL:http://localhost:5173/reset-password}
 
 springdoc:
   swagger-ui:

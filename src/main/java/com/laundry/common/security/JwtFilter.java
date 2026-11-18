@@ -22,6 +22,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtFilter extends OncePerRequestFilter {
 
     private static final String BEARER = "Bearer ";
+    /** Thời điểm cấp access token; phiên khách so với lần đổi mật khẩu gần nhất để thu hồi phiên cũ. */
+    public static final String ISSUED_AT_ATTRIBUTE = "jwtIssuedAt";
 
     private final JwtUtil jwtUtil;
 
@@ -37,6 +39,9 @@ public class JwtFilter extends OncePerRequestFilter {
                 var auth = new UsernamePasswordAuthenticationToken(claims.getSubject(), null, authorities);
                 auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(auth);
+                if (claims.getIssuedAt() != null) {
+                    request.setAttribute(ISSUED_AT_ATTRIBUTE, claims.getIssuedAt().toInstant());
+                }
             });
         }
         chain.doFilter(request, response);

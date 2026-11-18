@@ -13,6 +13,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
+    Page<Order> findByCustomerId(Long customerId, Pageable pageable);
+
     Optional<Order> findByOrderCode(String orderCode);
 
     /** Khóa đơn khi áp voucher để không chạy chồng với xác nhận thanh toán */
