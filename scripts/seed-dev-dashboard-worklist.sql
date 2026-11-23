@@ -101,7 +101,8 @@ WHERE j = 0 OR d % 3 <> 1;
 INSERT INTO orders (created_at, updated_at, bag_count, customer_id, customer_name, customer_phone,
                     order_code, intake_code, order_type, payment_status, priority, status,
                     received_at, due_at, completed_at, delivered_at, delivered_by, notify_count, last_notified_at,
-                    shelf_location, subtotal, total_amount, service_type, created_by)
+                    shelf_location, subtotal, total_amount, service_type, created_by,
+                    wash_mode_id, wash_mode_name, wash_mode_hours)
 SELECT s.received_at, NOW(), 1, c.id, c.full_name, c.phone,
        'LD-' || to_char(s.received_at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYYMMDD') || '-' || lpad((890 + s.n)::text, 3, '0'),
        'NH-' || to_char(s.received_at AT TIME ZONE 'Asia/Ho_Chi_Minh', 'YYYYMMDD') || '-' || lpad((890 + s.n)::text, 3, '0'),
@@ -109,8 +110,12 @@ SELECT s.received_at, NOW(), 1, c.id, c.full_name, c.phone,
        s.received_at, s.due_at, s.completed_at, s.delivered_at,
        CASE WHEN s.delivered_at IS NOT NULL THEN 'seed_staff' END,
        s.notify_count, CASE WHEN s.notify_count > 0 THEN s.completed_at + interval '2 days' END,
-       s.shelf, s.amount, s.amount, 'WASH_DRY', 'seed-013'
+       s.shelf, s.amount, s.amount, 'WASH_DRY', 'seed-013',
+       w.id, w.name, w.completion_hours
 FROM seed_orders s
+JOIN wash_modes w ON w.id = CASE WHEN s.order_type = 'EXPRESS'
+    THEN (SELECT id FROM wash_modes ORDER BY completion_hours, id LIMIT 1)
+    ELSE (SELECT id FROM wash_modes WHERE is_default LIMIT 1) END
 JOIN customers c ON c.customer_code = 'KH99' || lpad((1 + s.n % 10)::text, 2, '0');
 
 -- Một dòng đồ cho mỗi đơn đã phân loại

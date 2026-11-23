@@ -1,11 +1,10 @@
 package com.laundry.modules.order.application.dto;
 
 import com.laundry.modules.order.domain.Order;
+import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.order.domain.OrderPriority;
 import com.laundry.modules.order.domain.OrderStatus;
-import com.laundry.modules.order.domain.OrderType;
 import com.laundry.modules.order.domain.PaymentStatus;
-import com.laundry.modules.order.domain.ServiceType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -18,17 +17,19 @@ public record OrderDetailResponse(
         Long customerId,
         String customerName,
         String customerPhone,
-        ServiceType serviceType,
-        String serviceName,
         BigDecimal totalWeight,
         BigDecimal unitPrice,
         BigDecimal subtotal,
         BigDecimal discountAmount,
+        String voucherCode,
         BigDecimal expressFee,
         BigDecimal totalAmount,
+        BigDecimal payableAmount,
         String note,
         OrderPriority priority,
-        OrderType orderType,
+        Long washModeId,
+        String washModeName,
+        @Schema(description = "Giờ hoàn thành đã chụp trên đơn (chỉ đọc)") Integer washModeHours,
         OrderStatus status,
         String statusDescription,
         PaymentStatus paymentStatus,
@@ -50,15 +51,30 @@ public record OrderDetailResponse(
         Boolean washWhitesSeparately,
         BigDecimal whitesFee,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        BigDecimal incidentDiscount,
+        List<String> incidentCodes,
+        Integer compensationMultiplier,
+        BigDecimal compensationCap,
+        OrderChannel channel,
+        Instant confirmedAt,
+        String confirmedBy,
+        OrderFulfillmentResponse fulfillment,
+        Instant paymentClaimedAt,
+        String paymentClaimRejectedReason,
+        Instant paymentClaimRejectedAt
 ) {
     public static OrderDetailResponse from(Order order) {
         List<RequestedServiceDto> requested = order.getRequestedServiceIds() == null ? List.of()
-                : order.getRequestedServiceIds().stream().map(id -> new RequestedServiceDto(id, null, null)).toList();
-        return from(order, requested);
+                : order.getRequestedServiceIds().stream().map(id -> new RequestedServiceDto(id, null, null,
+                        order.getRequestedServicePrices() != null ? order.getRequestedServicePrices().get(id) : null)).toList();
+        return from(order, requested, List.of(), order.getCompensationMultiplier(), order.getCompensationCap());
     }
 
-    public static OrderDetailResponse from(Order order, List<RequestedServiceDto> requestedServices) {
+    /** {@code compensationMultiplier} / {@code compensationCap}: điều khoản đã quy đổi (đơn chưa chốt thì lấy cấu hình hiện hành). */
+    public static OrderDetailResponse from(Order order, List<RequestedServiceDto> requestedServices,
+                                           List<String> incidentCodes, Integer compensationMultiplier,
+                                           BigDecimal compensationCap) {
         List<OrderItemDto> itemDtos = order.getItems() != null
                 ? order.getItems().stream().map(OrderItemDto::from).toList()
                 : List.of();
@@ -73,17 +89,19 @@ public record OrderDetailResponse(
                 order.getCustomerId(),
                 order.getCustomerName(),
                 order.getCustomerPhone(),
-                order.getServiceType(),
-                order.getServiceType() != null ? order.getServiceType().getDisplayName() : null,
                 order.getTotalWeight(),
                 order.getUnitPrice(),
                 order.getSubtotal(),
                 order.getDiscountAmount(),
+                order.getVoucherCode(),
                 order.getExpressFee(),
                 order.getTotalAmount(),
+                order.payableAmount(),
                 order.getNote(),
                 order.getPriority(),
-                order.getOrderType(),
+                order.getWashModeId(),
+                order.getWashModeName(),
+                order.getWashModeHours(),
                 order.getStatus(),
                 order.getStatus().getDescription(),
                 order.getPaymentStatus(),
@@ -105,7 +123,18 @@ public record OrderDetailResponse(
                 order.getWashWhitesSeparately(),
                 order.getWhitesFee(),
                 order.getCreatedAt(),
-                order.getUpdatedAt()
+                order.getUpdatedAt(),
+                order.getIncidentDiscount(),
+                incidentCodes,
+                compensationMultiplier,
+                compensationCap,
+                order.getChannel(),
+                order.getConfirmedAt(),
+                order.getConfirmedBy(),
+                OrderFulfillmentResponse.from(order),
+                order.getPaymentClaimedAt(),
+                order.getPaymentClaimRejectedReason(),
+                order.getPaymentClaimRejectedAt()
         );
     }
 }

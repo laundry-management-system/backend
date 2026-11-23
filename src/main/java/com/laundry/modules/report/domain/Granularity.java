@@ -33,7 +33,7 @@ public enum Granularity {
         try {
             return valueOf(raw.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            throw new BusinessException("granularity chỉ nhận DAY hoặc MONTH", "granularity");
+            throw new BusinessException("Mức gộp chỉ nhận day hoặc month", "granularity");
         }
     }
 

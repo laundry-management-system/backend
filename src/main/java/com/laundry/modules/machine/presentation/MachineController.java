@@ -2,6 +2,7 @@ package com.laundry.modules.machine.presentation;
 
 import com.laundry.modules.machine.application.MachineService;
 import com.laundry.modules.machine.application.dto.ChangeMachineStatusRequest;
+import com.laundry.modules.machine.application.dto.CreateMachineBatchRequest;
 import com.laundry.modules.machine.application.dto.CreateMachineRequest;
 import com.laundry.modules.machine.application.dto.MachineResponse;
 import com.laundry.modules.machine.application.dto.UpdateMachineRequest;
@@ -62,6 +63,14 @@ public class MachineController {
     @PreAuthorize("hasRole('ADMIN')")
     public MachineResponse createMachine(@Valid @RequestBody CreateMachineRequest request) {
         return machineService.createMachine(request);
+    }
+
+    @Operation(summary = "Add several machines with the same details (Admin only)")
+    @PostMapping("/batch")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<MachineResponse> createMachines(@Valid @RequestBody CreateMachineBatchRequest request) {
+        return machineService.createMachines(request);
     }
 
     @Operation(summary = "Update machine details (UC18 - Admin only, BR-E)")

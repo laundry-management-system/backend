@@ -4,6 +4,7 @@ import com.laundry.common.exception.BusinessException;
 import com.laundry.common.exception.NotFoundException;
 import com.laundry.common.security.ActorIdResolver;
 import com.laundry.common.security.JwtUtil;
+import com.laundry.common.security.RefreshTokenStore;
 import com.laundry.modules.auth.application.dto.AuthDTO;
 import com.laundry.modules.auth.application.dto.LoginRequest;
 import com.laundry.modules.auth.domain.User;
@@ -16,7 +17,6 @@ import com.laundry.modules.setting.application.SettingService;
 import com.laundry.modules.setting.domain.SettingKey;
 import io.jsonwebtoken.Claims;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
@@ -41,10 +41,10 @@ public class AuthService {
     AuditLogService auditLogService;
     SettingService settingService;
     ActorIdResolver resolver;
+    RefreshTokenStore refreshTokenStore;
 
     String loginAttemptKeyPrefix = "laundry:auth:login:attempt:";
     String lockKeyPrefix = "laundry:auth:isLocked:";
-    String blacklistKeyPrefix = "laundry:auth:blacklist:";
 
     public AuthDTO login(LoginRequest loginRequest) {
         if(isLocked(loginRequest.username())){
@@ -80,7 +80,7 @@ public class AuthService {
 
     public void logout(String refreshToken){
         if(refreshToken == null || refreshToken.isBlank()) return;
-        jwtUtil.parseRefresh(refreshToken).ifPresent(this::consume);
+        jwtUtil.parseRefresh(refreshToken).ifPresent(refreshTokenStore::consume);
     }
 
     @Transactional(readOnly = true)
@@ -90,7 +90,7 @@ public class AuthService {
         }
 
         Claims claims = jwtUtil.parseRefresh(refreshToken).orElseThrow(AuthService::invalidSession);
-        if(!consume(claims)){
+        if(!refreshTokenStore.consume(claims)){
             throw invalidSession();
         }
         User user = userRepository
@@ -132,16 +132,6 @@ public class AuthService {
     private void resetFailedAttempts(String username){
         stringRedisTemplate.delete(loginAttemptKeyPrefix + username);
         stringRedisTemplate.delete(lockKeyPrefix + username);
-    }
-
-    /** Đánh dấu refresh token đã dùng. Trả true nếu đây là lần dùng đầu tiên. */
-    private boolean consume(Claims claims) {
-        Duration remaining = Duration.between(Instant.now(), claims.getExpiration().toInstant());
-        if (remaining.toMillis() <= 0) {
-            return false;
-        }
-        return Boolean.TRUE.equals(stringRedisTemplate.opsForValue()
-                .setIfAbsent(blacklistKeyPrefix + claims.getId(), "1", remaining));
     }
 
     private static BadCredentialsException invalidSession() {

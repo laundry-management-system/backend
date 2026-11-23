@@ -11,9 +11,6 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "app.payment.vietqr")
 public class VietQrProperties {
 
-    private String bankId = "";
-    private String accountNo = "";
-    private String accountName = "";
     private String template = "compact2";
     private String imageBaseUrl = "https://img.vietqr.io/image";
 }

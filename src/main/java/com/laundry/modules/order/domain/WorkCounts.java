@@ -12,5 +12,7 @@ public interface WorkCounts {
 
     long getLate();
 
-    long getExpress();
+    long getPendingConfirmation();
+
+    long getAwaitingDropoff();
 }

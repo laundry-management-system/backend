@@ -1,5 +1,6 @@
 package com.laundry.modules.report.application.dto;
 
+import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.report.domain.Granularity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
@@ -21,7 +22,10 @@ public record RevenueReportResponse(
         List<Row> rows,
 
         @Schema(description = "Tổng cộng toàn khoảng")
-        Summary summary
+        Summary summary,
+
+        @Schema(description = "Kỳ liền trước cùng số ngày, để so sánh")
+        Previous previous
 ) {
 
     @Schema(description = "Doanh thu của một kỳ")
@@ -35,6 +39,12 @@ public record RevenueReportResponse(
             @Schema(description = "Doanh thu chuyển khoản")
             BigDecimal bankTransfer,
 
+            @Schema(description = "Doanh thu đơn online")
+            BigDecimal online,
+
+            @Schema(description = "Doanh thu đơn tại quầy")
+            BigDecimal offline,
+
             @Schema(description = "Tổng doanh thu của kỳ")
             BigDecimal total,
 
@@ -47,6 +57,24 @@ public record RevenueReportResponse(
             BigDecimal cash,
             BigDecimal bankTransfer,
             BigDecimal total,
-            long paymentCount
+            long paymentCount,
+
+            @Schema(description = "Số giao dịch tiền mặt")
+            long cashCount,
+
+            @Schema(description = "Số giao dịch chuyển khoản")
+            long bankTransferCount,
+
+            @Schema(description = "Tiền thực thu theo kênh của đơn, luôn đủ ONLINE và OFFLINE, bỏ qua bộ lọc kênh")
+            List<ChannelRevenue> byChannel,
+
+            @Schema(description = "Số đơn có thanh toán được tính vào doanh thu kỳ")
+            long paidOrders
     ) {}
+
+    @Schema(description = "Doanh thu kỳ liền trước")
+    public record Previous(LocalDate from, LocalDate to, BigDecimal total, long paidOrders) {}
+
+    @Schema(description = "Doanh thu của một kênh")
+    public record ChannelRevenue(OrderChannel channel, BigDecimal total, long paymentCount) {}
 }

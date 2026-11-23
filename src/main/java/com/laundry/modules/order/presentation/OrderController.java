@@ -2,14 +2,16 @@ package com.laundry.modules.order.presentation;
 
 import com.laundry.modules.order.application.OrderService;
 import com.laundry.modules.order.application.dto.AddOrderItemImageRequest;
+import com.laundry.modules.order.application.dto.CompleteDropoffRequest;
+import com.laundry.modules.order.application.dto.StartDeliveryRequest;
+import com.laundry.modules.order.application.dto.UndoDeliveryRequest;
+import com.laundry.modules.order.application.dto.UpdateTrackingCodesRequest;
 import com.laundry.modules.order.application.dto.AdjustPriceRequest;
+import com.laundry.modules.order.application.dto.ApplyOrderVoucherRequest;
 import com.laundry.modules.order.application.dto.CancelOrderRequest;
 import com.laundry.modules.order.application.dto.ChangeStatusRequest;
 import com.laundry.modules.order.application.dto.CompleteOrderRequest;
 import com.laundry.modules.order.application.dto.CustomerTrackingResponse;
-import com.laundry.modules.order.application.dto.DeliverOrderRequest;
-import com.laundry.modules.order.application.dto.EstimateReturnTimeRequest;
-import com.laundry.modules.order.application.dto.EstimateReturnTimeResponse;
 import com.laundry.modules.order.application.dto.IntakeRequest;
 import com.laundry.modules.order.application.dto.IntakeResponse;
 import com.laundry.modules.order.application.dto.OrderDetailResponse;
@@ -17,14 +19,16 @@ import com.laundry.modules.order.application.dto.OrderFilter;
 import com.laundry.modules.order.application.dto.OrderImageDto;
 import com.laundry.modules.order.application.dto.OrderReceiptResponse;
 import com.laundry.modules.order.application.dto.OrderResponse;
-import com.laundry.modules.order.application.dto.QuickCreateOrderRequest;
+import com.laundry.modules.order.application.dto.RejectOrderRequest;
+import com.laundry.modules.order.application.dto.RejectPaymentClaimRequest;
+import com.laundry.modules.order.application.dto.RescheduleAppointmentRequest;
 import com.laundry.modules.order.application.dto.RescheduleOrderRequest;
 import com.laundry.modules.order.application.dto.RevertStatusRequest;
 import com.laundry.modules.order.application.dto.UpdateOrderItemsRequest;
 import com.laundry.modules.order.application.dto.WorkCountsResponse;
+import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.order.domain.OrderPriority;
 import com.laundry.modules.order.domain.OrderStatus;
-import com.laundry.modules.order.domain.OrderType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,7 +37,6 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -56,17 +59,6 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrderController {
 
     private final OrderService orderService;
-
-    @Operation(summary = "Tiếp nhận đồ & tạo đơn (UC04 / BM3 - Fast Check-in)")
-    @PostMapping("/quick-create")
-    @ResponseStatus(HttpStatus.CREATED)
-    public OrderDetailResponse quickCreate(
-            @Valid @RequestBody QuickCreateOrderRequest request,
-            Authentication authentication
-    ) {
-        String staff = getUsername(authentication);
-        return orderService.quickCreate(request, staff);
-    }
 
     @Operation(summary = "Tiếp nhận đồ v3: tạo lượt nhận 1–2 đơn (Tiêu chuẩn / Giặt nhanh), chưa có dòng đồ và giá")
     @PostMapping("/intake")
@@ -92,14 +84,6 @@ public class OrderController {
         return orderService.getReceipt(id, baseUrl);
     }
 
-    @Operation(summary = "Tính tiền & gợi ý ngày hẹn (UC04 - include)")
-    @PostMapping("/estimate-return-time")
-    public EstimateReturnTimeResponse estimateReturnTime(
-            @Valid @RequestBody EstimateReturnTimeRequest request
-    ) {
-        return orderService.estimateReturnTime(request);
-    }
-
     @Operation(summary = "Nhập danh sách chi tiết các món đồ sau khi kiểm đếm (UC04)")
     @PutMapping("/{id}/items")
     public OrderDetailResponse updateItems(
@@ -109,6 +93,16 @@ public class OrderController {
     ) {
         String staff = getUsername(authentication);
         return orderService.updateItems(id, request, staff);
+    }
+
+    @Operation(summary = "Áp / đổi / gỡ voucher ở bước thanh toán (đơn đã hoàn thành, chưa thu tiền)")
+    @PutMapping("/{id}/voucher")
+    public OrderDetailResponse applyVoucher(
+            @PathVariable Long id,
+            @Valid @RequestBody ApplyOrderVoucherRequest request,
+            Authentication authentication
+    ) {
+        return orderService.applyVoucher(id, request, getUsername(authentication));
     }
 
     @Operation(summary = "Đính kèm ảnh tình trạng món đồ có vấn đề (ố, rách - UC04 extend)")
@@ -138,8 +132,9 @@ public class OrderController {
     public Page<OrderResponse> getOrders(
             @RequestParam(required = false) OrderStatus status,
             @RequestParam(required = false) List<OrderStatus> statuses,
+            @RequestParam(required = false) OrderChannel channel,
             @RequestParam(required = false) OrderPriority priority,
-            @RequestParam(required = false) OrderType orderType,
+            @RequestParam(required = false) Long washModeId,
             @RequestParam(required = false) Boolean classified,
             @RequestParam(required = false) Boolean late,
             @RequestParam(required = false) String dueFrom,
@@ -147,10 +142,10 @@ public class OrderController {
             @RequestParam(required = false) String phone,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String intakeCode,
-            @PageableDefault(size = 20, sort = "dueAt", direction = Sort.Direction.ASC) Pageable pageable
+            @PageableDefault(size = 20) Pageable pageable
     ) {
-        OrderFilter filter = OrderFilter.of(status, statuses, priority, phone, search, intakeCode,
-                orderType, classified, late, dueFrom, dueTo);
+        OrderFilter filter = OrderFilter.of(status, statuses, channel, priority, phone, search, intakeCode,
+                washModeId, classified, late, dueFrom, dueTo);
         return orderService.getOrders(filter, pageable);
     }
 
@@ -161,13 +156,14 @@ public class OrderController {
     )
     @GetMapping("/work-counts")
     public WorkCountsResponse getWorkCounts(
+            @RequestParam(required = false) OrderChannel channel,
             @RequestParam(required = false) String phone,
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String dueFrom,
             @RequestParam(required = false) String dueTo
     ) {
         return orderService.getWorkCounts(
-                OrderFilter.of(null, null, null, phone, search, null, null, null, null, dueFrom, dueTo));
+                OrderFilter.of(null, null, channel, null, phone, search, null, null, null, null, dueFrom, dueTo));
     }
 
     @Operation(summary = "Xem chi tiết đầy đủ đơn hàng (BM3, BM5)")
@@ -196,17 +192,6 @@ public class OrderController {
     ) {
         String staff = getUsername(authentication);
         return orderService.completeOrder(id, request, staff);
-    }
-
-    @Operation(summary = "Giao đồ cho khách hoặc người nhận hộ (UC12 / QĐ9)")
-    @PostMapping("/{id}/deliver")
-    public OrderDetailResponse deliverOrder(
-            @PathVariable Long id,
-            @Valid @RequestBody DeliverOrderRequest request,
-            Authentication authentication
-    ) {
-        String staff = getUsername(authentication);
-        return orderService.deliverOrder(id, request, staff);
     }
 
     @Operation(summary = "Lùi trạng thái đơn kèm lý do bắt buộc (UC22 / BR-D06)")
@@ -242,7 +227,7 @@ public class OrderController {
         return orderService.adjustPrice(id, request, staff);
     }
 
-    @Operation(summary = "Hủy đơn hàng khi Mới nhận kèm lý do (UC05 / BR-D05)")
+    @Operation(summary = "Hủy đơn hàng trước khi nhận đồ, kèm mã lý do (UC05 / BR-D05)")
     @PostMapping("/{id}/cancel")
     public OrderDetailResponse cancel(
             @PathVariable Long id,
@@ -251,6 +236,82 @@ public class OrderController {
     ) {
         String staff = getUsername(authentication);
         return orderService.cancel(id, request, staff);
+    }
+
+    @Operation(summary = "Xác nhận đơn online (Chờ xác nhận -> Chờ nhận đồ)")
+    @PostMapping("/{id}/confirm")
+    public OrderDetailResponse confirm(@PathVariable Long id, Authentication authentication) {
+        return orderService.confirm(id, getUsername(authentication));
+    }
+
+    @Operation(summary = "Từ chối đơn online ở Chờ xác nhận kèm lý do gửi khách")
+    @PostMapping("/{id}/reject")
+    public OrderDetailResponse reject(
+            @PathVariable Long id,
+            @Valid @RequestBody RejectOrderRequest request,
+            Authentication authentication
+    ) {
+        return orderService.reject(id, request, getUsername(authentication));
+    }
+
+    @Operation(summary = "Từ chối báo thanh toán của khách kèm lý do")
+    @PostMapping("/{id}/payment-claim/reject")
+    public OrderDetailResponse rejectPaymentClaim(
+            @PathVariable Long id,
+            @Valid @RequestBody RejectPaymentClaimRequest request,
+            Authentication authentication
+    ) {
+        return orderService.rejectPaymentClaim(id, request.reason(), getUsername(authentication));
+    }
+
+    @Operation(summary = "Sửa giờ hẹn gửi / giờ hẹn nhận của đơn chưa nhận đồ")
+    @PatchMapping("/{id}/appointment")
+    public OrderDetailResponse rescheduleAppointment(
+            @PathVariable Long id,
+            @Valid @RequestBody RescheduleAppointmentRequest request,
+            Authentication authentication
+    ) {
+        return orderService.rescheduleAppointment(id, request, getUsername(authentication));
+    }
+
+    @Operation(summary = "Đã nhận đồ khách mang tới / shipper lấy về")
+    @PostMapping("/{id}/fulfillment/dropoff")
+    public OrderDetailResponse completeDropoff(
+            @PathVariable Long id,
+            @Valid @RequestBody CompleteDropoffRequest request,
+            Authentication authentication
+    ) {
+        return orderService.completeDropoff(id, request, getUsername(authentication));
+    }
+
+    @Operation(summary = "Chuyển đơn hoàn thành sang Đang giao")
+    @PostMapping("/{id}/fulfillment/start-delivery")
+    public OrderDetailResponse startDelivery(
+            @PathVariable Long id,
+            @Valid @RequestBody StartDeliveryRequest request,
+            Authentication authentication
+    ) {
+        return orderService.startDelivery(id, request, getUsername(authentication));
+    }
+
+    @Operation(summary = "Hoàn tác Đang giao về Chờ giao")
+    @PostMapping("/{id}/fulfillment/undo-delivery")
+    public OrderDetailResponse undoStartDelivery(
+            @PathVariable Long id,
+            @Valid @RequestBody UndoDeliveryRequest request,
+            Authentication authentication
+    ) {
+        return orderService.undoStartDelivery(id, request, getUsername(authentication));
+    }
+
+    @Operation(summary = "Sửa mã vận đơn")
+    @PatchMapping("/{id}/fulfillment/tracking")
+    public OrderDetailResponse updateTrackingCodes(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateTrackingCodesRequest request,
+            Authentication authentication
+    ) {
+        return orderService.updateTrackingCodes(id, request, getUsername(authentication));
     }
 
     private String getUsername(Authentication authentication) {

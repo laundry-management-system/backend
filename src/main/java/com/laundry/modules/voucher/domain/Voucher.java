@@ -94,6 +94,29 @@ public class Voucher extends BaseEntity {
         }
     }
 
+    /**
+     * Lý do không áp được voucher cho đơn (null nếu áp được), cùng thứ tự kiểm tra với màn phân loại.
+     * {@code needsFreeUse = false} khi đơn đã giữ lượt của voucher này (lưu phân loại lần nữa).
+     */
+    public String rejectionReason(BigDecimal orderValue, LocalDate today, boolean needsFreeUse) {
+        if (!isActive()) {
+            return "Mã voucher không hợp lệ";
+        }
+        if (today.isBefore(startDate)) {
+            return "Mã voucher không hợp lệ";
+        }
+        if (today.isAfter(endDate)) {
+            return "Mã voucher đã hết hạn";
+        }
+        if (needsFreeUse && !hasAvailableUses()) {
+            return "Mã voucher đã hết lượt sử dụng";
+        }
+        if (!satisfiesMinOrderValue(orderValue)) {
+            return "Đơn chưa đạt giá trị tối thiểu " + (minOrderValue != null ? minOrderValue : BigDecimal.ZERO).toPlainString() + " để dùng mã này";
+        }
+        return null;
+    }
+
     public boolean isActive() {
         return this.status == VoucherStatus.ACTIVE;
     }
@@ -133,7 +156,7 @@ public class Voucher extends BaseEntity {
 
     public void incrementUsedCount() {
         if (!hasAvailableUses()) {
-            throw new BusinessException("Voucher '" + code + "' has reached its maximum usage limit (BR-G03)");
+            throw new BusinessException("Mã voucher đã hết lượt sử dụng");
         }
         this.usedCount++;
     }

@@ -12,7 +12,7 @@ public record OrderSnapshot(
         String customerPhone,
         Instant receivedAt,
         Instant dueAt,
-        BigDecimal totalAmount,
+        BigDecimal payableAmount,
         String status,
         String paymentStatus,
         Instant completedAt,

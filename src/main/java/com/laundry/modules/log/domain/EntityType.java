@@ -11,5 +11,8 @@ public enum EntityType {
     MACHINE,
     VOUCHER,
     INCIDENT,
-    SHIFT
+    SHIFT,
+    SERVICE_AREA,
+    CUSTOMER_REGISTRATION,
+    BOOKING_REQUEST
 }

@@ -5,6 +5,7 @@ import com.laundry.modules.customer.application.dto.ChangeCustomerStatusRequest;
 import com.laundry.modules.customer.application.dto.CreateCustomerRequest;
 import com.laundry.modules.customer.application.dto.CustomerResponse;
 import com.laundry.modules.customer.application.dto.UpdateCustomerRequest;
+import com.laundry.modules.customer.domain.CustomerStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -67,9 +68,11 @@ public class CustomerController {
     @GetMapping
     public Page<CustomerResponse> listCustomers(
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) CustomerStatus status,
+            @RequestParam(defaultValue = "false") boolean pendingAccount,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
-        return customerService.listCustomers(search, pageable);
+        return customerService.listCustomers(search, status, pendingAccount, pageable);
     }
 
     @Operation(summary = "Update customer details (UC02)")

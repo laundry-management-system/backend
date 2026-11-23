@@ -46,9 +46,6 @@ app:
     allowed-origins: ${CORS_ORIGINS}
   payment:
     vietqr:
-      bank-id: ${VIETQR_BANK_ID:}
-      account-no: ${VIETQR_ACCOUNT_NO:}
-      account-name: ${VIETQR_ACCOUNT_NAME:}
       template: ${VIETQR_TEMPLATE:compact2}
       image-base-url: ${VIETQR_IMAGE_BASE_URL:https://img.vietqr.io/image}
   public-lookup:
@@ -59,6 +56,7 @@ app:
   frontend:
     setup-password-url: ${SETUP_PASSWORD_URL} # TODO: Gắn link trang nhập mật khẩu vào biến
     public-lookup-url: ${PUBLIC_LOOKUP_URL:http://localhost:5173/track-order}
+    customer-reset-password-url: ${CUSTOMER_RESET_PASSWORD_URL:http://localhost:5173/reset-password}
 
 springdoc:
   swagger-ui:

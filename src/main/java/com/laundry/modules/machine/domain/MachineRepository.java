@@ -15,6 +15,13 @@ public interface MachineRepository extends JpaRepository<Machine, Long> {
 
     long countByType(MachineType type);
 
+    boolean existsBySerialNumber(String serialNumber);
+
+    @Query("SELECT m.machineCode FROM Machine m WHERE UPPER(m.machineCode) LIKE CONCAT(UPPER(:prefix), '%')")
+    List<String> findCodesStartingWith(@Param("prefix") String prefix);
+
+    boolean existsBySerialNumberAndIdNot(String serialNumber, Long id);
+
     @Query("SELECT m FROM Machine m WHERE " +
             "(:type IS NULL OR m.type = :type) AND " +
             "(:status IS NULL OR m.status = :status) " +

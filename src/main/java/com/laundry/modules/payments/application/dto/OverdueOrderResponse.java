@@ -7,9 +7,12 @@ public record OverdueOrderResponse(
         String orderCode,
         String customerName,
         String customerPhone,
+        boolean customerVip,
         Instant completedAt,
         long daysInStorage,
         int notifyCount,
-        String shelfLocation
+        Instant lastNotifiedAt,
+        String shelfLocation,
+        String paymentStatus
 ) {
 }

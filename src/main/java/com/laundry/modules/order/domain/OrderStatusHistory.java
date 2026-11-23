@@ -44,5 +44,9 @@ public class OrderStatusHistory extends BaseEntity {
 
     @Column(length = 100)
     private String performedBy;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 40)
+    private CancelReason reasonCode;
 }
 

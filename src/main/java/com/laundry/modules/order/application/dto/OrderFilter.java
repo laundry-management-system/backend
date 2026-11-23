@@ -1,9 +1,9 @@
 package com.laundry.modules.order.application.dto;
 
 import com.laundry.common.exception.BusinessException;
+import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.order.domain.OrderPriority;
 import com.laundry.modules.order.domain.OrderStatus;
-import com.laundry.modules.order.domain.OrderType;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -14,11 +14,12 @@ import java.util.List;
 public record OrderFilter(
         OrderStatus status,
         List<OrderStatus> statuses,
+        OrderChannel channel,
         OrderPriority priority,
         String phone,
         String search,
         String intakeCode,
-        OrderType orderType,
+        Long washModeId,
         Boolean classified,
         Boolean late,
         Instant dueStart,
@@ -27,8 +28,9 @@ public record OrderFilter(
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
-    public static OrderFilter of(OrderStatus status, List<OrderStatus> statuses, OrderPriority priority,
-                                 String phone, String search, String intakeCode, OrderType orderType,
+    public static OrderFilter of(OrderStatus status, List<OrderStatus> statuses, OrderChannel channel,
+                                 OrderPriority priority,
+                                 String phone, String search, String intakeCode, Long washModeId,
                                  Boolean classified, Boolean late, String dueFrom, String dueTo) {
         LocalDate from = parseDate(dueFrom, "dueFrom");
         LocalDate to = parseDate(dueTo, "dueTo");
@@ -38,11 +40,12 @@ public record OrderFilter(
         return new OrderFilter(
                 status,
                 statuses == null ? List.of() : List.copyOf(statuses),
+                channel,
                 priority,
                 clean(phone),
                 clean(search),
                 clean(intakeCode),
-                orderType,
+                washModeId,
                 classified,
                 late,
                 from == null ? null : from.atStartOfDay(ZONE).toInstant(),
