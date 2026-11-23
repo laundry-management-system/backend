@@ -4,6 +4,7 @@ import com.laundry.modules.document.application.DocumentService;
 import com.laundry.modules.document.application.dto.DocumentResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
@@ -19,8 +20,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.concurrent.TimeUnit;
 
 @Tag(name = "Documents", description = "Tải lên và đọc file (ảnh, tài liệu) dùng chung cho các module")
 @RestController

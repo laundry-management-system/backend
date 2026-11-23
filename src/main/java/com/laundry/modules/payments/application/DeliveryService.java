@@ -8,11 +8,10 @@ import com.laundry.modules.payments.application.port.OrderSnapshot;
 import com.laundry.modules.payments.domain.Payment;
 import com.laundry.modules.payments.domain.PaymentRepository;
 import com.laundry.modules.payments.domain.PaymentStatus;
+import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +23,9 @@ public class DeliveryService {
     @Transactional
     public DeliveryResponse deliver(String orderCode, DeliveryRequest request, String username) {
         OrderSnapshot order = orderIntegration.lockByCode(orderCode);
+        if ("PENDING_CONFIRMATION".equals(order.status()) || "AWAITING_DROPOFF".equals(order.status())) {
+            throw new BusinessException("Đơn online chưa nhận đồ, chưa thể thực hiện thao tác này");
+        }
         if (!"COMPLETED".equals(order.status())) {
             throw new BusinessException("Chỉ giao được đơn đã hoàn thành");
         }
@@ -42,13 +44,21 @@ public class DeliveryService {
         Payment confirmedPayment = paymentRepository.findByOrderIdOrderByCreatedAtDesc(order.id()).stream()
                 .filter(payment -> payment.getStatus() == PaymentStatus.CONFIRMED)
                 .findFirst()
-                .orElseThrow(() -> new BusinessException("Đơn đang ở trạng thái đã thanh toán nhưng thiếu giao dịch"));
+                .orElse(null);
+        // Voucher giảm hết tiền: đơn tự PAID mà không có giao dịch (giao dịch phải > 0)
+        boolean nothingToPay = order.payableAmount() != null && order.payableAmount().signum() <= 0;
+        if (confirmedPayment == null && !nothingToPay) {
+            throw new BusinessException("Đơn đang ở trạng thái đã thanh toán nhưng thiếu giao dịch");
+        }
         Instant deliveredAt = Instant.now();
         orderIntegration.deliver(order.id(), deliveredAt, username, receiverName, receiverRelation);
 
         return new DeliveryResponse(order.orderCode(), order.customerName(), order.customerPhone(), order.dueAt(),
-                order.totalAmount(), confirmedPayment.getInvoiceNo(), confirmedPayment.getMethod(),
-                confirmedPayment.getPaidAt(), "DELIVERED", deliveredAt, username, receiverName, receiverRelation);
+                order.payableAmount(),
+                confirmedPayment != null ? confirmedPayment.getInvoiceNo() : null,
+                confirmedPayment != null ? confirmedPayment.getMethod() : null,
+                confirmedPayment != null ? confirmedPayment.getPaidAt() : null,
+                "DELIVERED", deliveredAt, username, receiverName, receiverRelation);
     }
 
     private static String normalize(String value) {

@@ -8,6 +8,9 @@ public interface OrderIntegration {
 
     Optional<OrderSnapshot> findByCode(String orderCode);
 
+    /** ONLINE order whose return leg is DELIVERY. */
+    boolean isOnlineDelivery(Long orderId);
+
     OrderSnapshot lockByCode(String orderCode);
 
     void setPaymentStatus(long orderId, boolean paid);
@@ -18,5 +21,5 @@ public interface OrderIntegration {
 
     void appendNote(long orderId, String note);
 
-    List<OrderSnapshot> findOverdue(Instant completedBefore);
+    List<OverdueSnapshot> findOverdue(Instant completedBefore);
 }

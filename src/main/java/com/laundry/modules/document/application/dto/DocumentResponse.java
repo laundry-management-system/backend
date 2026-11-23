@@ -1,7 +1,6 @@
 package com.laundry.modules.document.application.dto;
 
 import com.laundry.modules.document.domain.Document;
-
 import java.time.Instant;
 
 public record DocumentResponse(

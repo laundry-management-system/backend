@@ -2,12 +2,14 @@ package com.laundry.modules.service.application.dto;
 
 import com.laundry.modules.service.domain.ServiceUnit;
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-
 import java.math.BigDecimal;
+import java.util.List;
 
 public record CreateServiceRequest(
         @NotBlank(message = "Vui lòng nhập tên dịch vụ")
@@ -17,25 +19,22 @@ public record CreateServiceRequest(
         @NotNull(message = "Vui lòng chọn đơn vị tính")
         ServiceUnit unit,
 
-        @NotNull(message = "Vui lòng nhập đơn giá")
-        @DecimalMin(value = "0", message = "Đơn giá không được âm")
-        BigDecimal currentPrice,
-
-        @NotNull(message = "Vui lòng nhập thời gian xử lý chuẩn")
-        @Min(value = 1, message = "Thời gian xử lý chuẩn phải lớn hơn 0 giờ")
-        Integer standardHours,
-
-        Boolean expressSupported,
-
-        @DecimalMin(value = "0", message = "Phụ phí giặt nhanh không được âm")
-        BigDecimal expressSurcharge,
-
-        @Min(value = 1, message = "Thời gian giặt nhanh phải lớn hơn 0 giờ")
-        Integer expressHours,
-
+        @NotEmpty(message = "Vui lòng nhập giá theo hình thức giặt")
+        @Valid
+        List<PriceLine> prices,
 
         @DecimalMin(value = "0", message = "Tối thiểu không được âm")
         BigDecimal minQuantity,
 
         Boolean whitesApplicable
-) {}
+) {
+    public record PriceLine(
+            @NotNull(message = "Vui lòng chọn hình thức giặt")
+            Long washModeId,
+
+            @NotNull(message = "Vui lòng nhập giá")
+            @DecimalMin(value = "0", message = "Giá không được âm")
+            @Digits(integer = 12, fraction = 0, message = "Giá phải là số đồng nguyên")
+            BigDecimal price
+    ) {}
+}

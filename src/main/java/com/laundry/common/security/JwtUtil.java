@@ -5,6 +5,7 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import java.time.Duration;
 import java.util.*;
 import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +18,11 @@ public class JwtUtil {
     private static final String TYPE_CLAIM = "type";
     private static final String TYPE_ACCESS = "access";
     private static final String TYPE_REFRESH = "refresh";
+    private static final String TYPE_CUSTOMER_REFRESH = "customer_refresh";
+    private static final String CUSTOMER_SUBJECT_PREFIX = "customer:";
+    private static final String CUSTOMER_ROLE = "CUSTOMER";
+    // Phiên khách hết hạn sau 30 ngày không hoạt động; mỗi lần refresh cấp token mới nên hạn tự lăn
+    public static final Duration CUSTOMER_REFRESH_TTL = Duration.ofDays(30);
 
     private final SecretKey key;
     private final long expirationMs;
@@ -52,6 +58,41 @@ public class JwtUtil {
                 .expiration(new Date(now.getTime() + refreshExpirationMs))
                 .signWith(key)
                 .compact();
+    }
+
+    public String generateCustomerToken(long customerId) {
+        return generateToken(CUSTOMER_SUBJECT_PREFIX + customerId, List.of(CUSTOMER_ROLE));
+    }
+
+    public String generateCustomerRefreshToken(long customerId) {
+        Date now = new Date();
+        return Jwts.builder()
+                .id(UUID.randomUUID().toString())
+                .subject(CUSTOMER_SUBJECT_PREFIX + customerId)
+                .claim(TYPE_CLAIM, TYPE_CUSTOMER_REFRESH)
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + CUSTOMER_REFRESH_TTL.toMillis()))
+                .signWith(key)
+                .compact();
+    }
+
+    /** Chỉ nhận refresh token của khách; refresh token nhân viên không dùng được ở luồng khách và ngược lại. */
+    public Optional<Claims> parseCustomerRefresh(String token) {
+        return parseWithType(token, TYPE_CUSTOMER_REFRESH);
+    }
+
+    /** Id khách từ subject "customer:<id>"; rỗng nếu subject là của nhân viên. */
+    public static Optional<Long> customerIdOf(String subject) {
+        if (subject == null || !subject.startsWith(CUSTOMER_SUBJECT_PREFIX)) return Optional.empty();
+        try {
+            return Optional.of(Long.parseLong(subject.substring(CUSTOMER_SUBJECT_PREFIX.length())));
+        } catch (NumberFormatException e) {
+            return Optional.empty();
+        }
+    }
+
+    public static boolean isCustomerSubject(String subject) {
+        return subject != null && subject.startsWith(CUSTOMER_SUBJECT_PREFIX);
     }
 
     /** Chỉ nhận ACCESS token. JwtFilter dùng hàm này nên refresh token không gọi được API. */

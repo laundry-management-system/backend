@@ -1,12 +1,11 @@
 package com.laundry.modules.payments.infrastructure;
 
 import com.laundry.common.exception.TooManyRequestsException;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 @Component
 public class PublicLookupRateLimiter {

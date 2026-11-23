@@ -1,14 +1,20 @@
 package com.laundry.modules.service.presentation;
 
 import com.laundry.modules.service.application.LaundryServiceService;
+import com.laundry.modules.service.application.PriceHistoryService;
 import com.laundry.modules.service.application.dto.ChangeServiceStatusRequest;
 import com.laundry.modules.service.application.dto.CreateServiceRequest;
+import com.laundry.modules.service.application.dto.PriceHistoryRowResponse;
+import com.laundry.modules.service.application.dto.PriceIssuedResponse;
 import com.laundry.modules.service.application.dto.ServiceResponse;
 import com.laundry.modules.service.application.dto.UpdateServiceRequest;
+import com.laundry.modules.service.domain.PriceField;
 import com.laundry.modules.service.domain.ServiceStatus;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.time.Instant;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,8 +33,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @Tag(name = "Service & Pricing Management", description = "Service catalog and active pricing management (M3 - Member 2: UC03, UC17, BM2, QD2, BR-C)")
 @RestController
 @RequestMapping("/api/services")
@@ -36,6 +40,7 @@ import java.util.List;
 public class LaundryServiceController {
 
     private final LaundryServiceService laundryServiceService;
+    private final PriceHistoryService priceHistoryService;
 
     @Operation(summary = "Price list (paged): search by code/name, filter by status (Staff & Admin)")
     @GetMapping
@@ -52,6 +57,28 @@ public class LaundryServiceController {
     @GetMapping("/active")
     public List<ServiceResponse> listActiveServices() {
         return laundryServiceService.listActiveServices();
+    }
+
+    @Operation(summary = "Price change history (Admin only, BR-C02)",
+            description = "Mỗi trường đổi một dòng, mới nhất trước. Lọc theo dịch vụ, người sửa, loại thay đổi, khoảng thời gian (to loại trừ). size tối đa 1000")
+    @GetMapping("/price-history")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Page<PriceHistoryRowResponse> priceHistory(
+            @RequestParam(required = false) Long serviceId,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) PriceField field,
+            @RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size
+    ) {
+        return priceHistoryService.list(serviceId, userId, field, from, to, page, size);
+    }
+
+    @Operation(summary = "Latest price list issue (date + issuer) for the price list subtitle (Staff & Admin)")
+    @GetMapping("/price-issued")
+    public PriceIssuedResponse priceIssued() {
+        return priceHistoryService.latestIssued();
     }
 
     @Operation(summary = "Get service details by ID")
@@ -74,7 +101,8 @@ public class LaundryServiceController {
         return laundryServiceService.createService(request);
     }
 
-    @Operation(summary = "Update service details and price (UC17 - Admin only, BR-C01, QD2)")
+    @Operation(summary = "Update service details and price (UC17 - Admin only, BR-C01, QD2)",
+            description = "priceChangeReason bắt buộc khi đổi đơn giá, phụ phí giặt nhanh, thời gian xử lý hoặc trạng thái; mỗi lần đổi ghi lịch sử giá (BR-C02)")
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ServiceResponse updateService(
@@ -84,13 +112,14 @@ public class LaundryServiceController {
         return laundryServiceService.updateService(id, request);
     }
 
-    @Operation(summary = "Change service status (ACTIVE / INACTIVE) - Soft deactivate")
+    @Operation(summary = "Change service status (ACTIVE / INACTIVE) - Soft deactivate",
+            description = "reason bắt buộc khi trạng thái thật sự đổi; ghi lịch sử giá (BR-C02)")
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ServiceResponse changeStatus(
             @PathVariable Long id,
             @Valid @RequestBody ChangeServiceStatusRequest request
     ) {
-        return laundryServiceService.changeStatus(id, request.status());
+        return laundryServiceService.changeStatus(id, request.status(), request.reason());
     }
 }

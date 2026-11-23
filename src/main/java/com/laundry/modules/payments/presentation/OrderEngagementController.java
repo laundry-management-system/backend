@@ -8,7 +8,7 @@ import com.laundry.modules.payments.application.dto.ComposeNotificationRequest;
 import com.laundry.modules.payments.application.dto.DeliveryRequest;
 import com.laundry.modules.payments.application.dto.DeliveryResponse;
 import com.laundry.modules.payments.application.dto.NotificationResponse;
-import com.laundry.modules.payments.application.dto.OverdueOrderResponse;
+import com.laundry.modules.payments.application.dto.OverdueOrderListResponse;
 import com.laundry.modules.payments.application.dto.PaymentDiscrepancyRequest;
 import com.laundry.modules.payments.application.dto.PaymentDiscrepancyResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,8 +22,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @Tag(name = "Order delivery and customer contact")
 @RestController
@@ -51,7 +49,7 @@ public class OrderEngagementController {
     }
 
     @GetMapping("/overdue")
-    public List<OverdueOrderResponse> overdueOrders() {
+    public OverdueOrderListResponse overdueOrders() {
         return overdueOrderService.list();
     }
 

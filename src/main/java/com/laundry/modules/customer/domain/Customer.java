@@ -8,6 +8,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -56,6 +57,27 @@ public class Customer extends BaseEntity {
 
     @Column(name = "created_by", length = 50)
     private String createdBy;
+
+    @Column(name = "email", length = 255)
+    private String email;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "source", nullable = false, length = 20, columnDefinition = "varchar(20) default 'COUNTER'")
+    @Builder.Default
+    private CustomerSource source = CustomerSource.COUNTER;
+
+    @Column(name = "password_hash", length = 100)
+    private String passwordHash;
+
+    @Column(name = "password_changed_at")
+    private Instant passwordChangedAt;
+
+    @Column(name = "last_login_at")
+    private Instant lastLoginAt;
+
+    public boolean hasAccount() {
+        return passwordHash != null;
+    }
 
     public void deactivate() {
         if (this.status == CustomerStatus.INACTIVE) {

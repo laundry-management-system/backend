@@ -1,8 +1,7 @@
 package com.laundry.modules.document.domain;
 
-import org.springframework.data.jpa.repository.JpaRepository;
-
 import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface DocumentRepository extends JpaRepository<Document, Long> {
 

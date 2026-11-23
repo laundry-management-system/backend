@@ -1,5 +1,6 @@
 package com.laundry.common.config;
 
+import com.laundry.common.exception.GlobalExceptionHandler;
 import com.laundry.common.security.JwtFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -28,6 +29,7 @@ public class SecurityConfig {
     private static final String[] PUBLIC_PATHS = {
             "/api/health",
             "/api/auth/**",
+            "/api/customer-auth/**",
             "/api/public/orders/lookup",
             "/api/users/setup-password",
             "/api/orders/track",
@@ -52,15 +54,33 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(PUBLIC_PATHS).permitAll()
-                        .anyRequest().authenticated())
+                        .requestMatchers(HttpMethod.GET, "/api/public/store", "/api/public/services", "/api/public/wash-modes", "/api/public/service-areas", "/api/public/booking-settings").permitAll()
+                        .requestMatchers("/api/customer-portal/**").hasRole("CUSTOMER")
+                        // Phần lớn controller quản trị không có @PreAuthorize nên phải chặn token khách ở đây
+                        .anyRequest().hasAnyRole("ADMIN", "STAFF"))
                 // Lỗi ở tầng filter không tới được @RestControllerAdvice, nên tự trả ProblemDetail
                 .exceptionHandling(e -> e
                         .authenticationEntryPoint((req, res, ex) ->
-                                writeProblem(res, HttpServletResponse.SC_UNAUTHORIZED, "Chưa đăng nhập hoặc token không hợp lệ"))
-                        .accessDeniedHandler((req, res, ex) ->
-                                writeProblem(res, HttpServletResponse.SC_FORBIDDEN, "Không có quyền thực hiện thao tác này")))
+                                writeProblem(res, HttpServletResponse.SC_UNAUTHORIZED, GlobalExceptionHandler.unauthorizedDetail(req.getRequestURI())))
+                        // Token nhân viên gọi đặt đơn bị từ chối như chưa đăng nhập khách (R3); path khác vẫn 403
+                        .accessDeniedHandler((req, res, ex) -> {
+                            if (GlobalExceptionHandler.isBookingPath(req.getRequestURI())) {
+                                writeProblem(res, HttpServletResponse.SC_UNAUTHORIZED, GlobalExceptionHandler.unauthorizedDetail(req.getRequestURI()));
+                            } else {
+                                writeProblem(res, HttpServletResponse.SC_FORBIDDEN, "Không có quyền thực hiện thao tác này");
+                            }
+                        }))
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
+    }
+
+    private static void writeProblem(HttpServletResponse res, int status, String detail) throws IOException {
+        res.setStatus(status);
+        res.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+        res.setCharacterEncoding("UTF-8");
+        res.getWriter().write("""
+                {"status":%d,"title":"%s","detail":"%s"}
+                """.formatted(status, status == 401 ? "Unauthorized" : "Forbidden", detail));
     }
 
     @Bean
@@ -71,12 +91,5 @@ public class SecurityConfig {
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
-    }
-
-    private static void writeProblem(HttpServletResponse res, int status, String detail) throws IOException {
-        res.setStatus(status);
-        res.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-        res.setCharacterEncoding("UTF-8");
-        res.getWriter().write("{\"type\":\"about:blank\",\"status\":%d,\"detail\":\"%s\"}".formatted(status, detail));
     }
 }

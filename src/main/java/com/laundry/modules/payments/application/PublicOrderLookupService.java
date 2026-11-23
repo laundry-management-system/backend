@@ -23,6 +23,6 @@ public class PublicOrderLookupService {
         OrderSnapshot order = orderIntegration.findByCode(request.orderCode())
                 .filter(found -> found.customerPhone().equals(request.phone()))
                 .orElseThrow(() -> NotFoundException.of("Đơn hàng", request.orderCode()));
-        return new PublicOrderLookupResponse(order.status(), order.dueAt(), order.totalAmount(), order.paymentStatus());
+        return new PublicOrderLookupResponse(order.status(), order.dueAt(), order.payableAmount(), order.paymentStatus());
     }
 }

@@ -1,0 +1,133 @@
+package com.laundry.modules.report.application.dto;
+
+import com.laundry.modules.order.domain.OrderChannel;
+import com.laundry.modules.report.domain.Granularity;
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+
+@Schema(description = "Báo cáo đơn hàng và doanh thu theo dịch vụ , tính trên các đơn nhận trong khoảng ngày")
+public record OrderReportResponse(
+        @Schema(description = "Ngày bắt đầu", example = "2026-10-01")
+        LocalDate from,
+
+        @Schema(description = "Ngày kết thúc", example = "2026-10-31")
+        LocalDate to,
+
+        @Schema(description = "Đơn vị gom nhóm của rows", example = "DAY")
+        Granularity granularity,
+
+        Summary summary,
+
+        Previous previous,
+
+        @Schema(description = "Lý do hủy, luôn đủ mọi mã, sắp theo count giảm dần rồi thứ tự danh mục")
+        List<CancelReasonCount> cancelReasons,
+
+        Processing processing,
+
+        @Schema(description = "Đơn nhận theo hình thức giặt, sắp theo amount giảm dần")
+        List<WashModeTotals> byWashMode,
+
+        @Schema(description = "Phễu đơn online; null khi lọc kênh OFFLINE")
+        Online online,
+
+        @Schema(description = "Số đơn theo từng trạng thái đã nhận đồ (gồm Đã hủy, không có thì 0)")
+        List<StatusCount> byStatus,
+
+        @Schema(description = "Doanh thu theo dịch vụ, sắp giảm dần theo doanh thu")
+        List<ServiceRevenue> byService,
+
+        @Schema(description = "Số đơn nhận theo từng ngày/tháng (không gồm đơn đã hủy), đã điền 0 cho mốc không có đơn")
+        List<PeriodCount> rows
+) {
+
+    @Schema(description = "Số đơn nhận của một mốc")
+    public record PeriodCount(
+            @Schema(description = "Nhãn mốc: yyyy-MM-dd (DAY) hoặc yyyy-MM (MONTH)", example = "2026-10-01")
+            String period,
+
+            long received
+    ) {}
+
+    @Schema(description = "Tổng hợp đơn hàng trong kỳ")
+    public record Summary(
+            @Schema(description = "Tổng số đơn nhận trong kỳ, gồm cả đơn đã hủy")
+            long totalOrders,
+
+            @Schema(description = "Số đơn có delivered_at trong kỳ")
+            long deliveredOrders,
+
+            @Schema(description = "Số đơn có sự kiện hủy trong kỳ")
+            long cancelledOrders,
+
+            @Schema(description = "Đơn nhận trong kỳ, hiện chưa DELIVERED / CANCELLED")
+            long activeOrders,
+
+            @Schema(description = "Số đơn đến hạn trong kỳ")
+            long dueOrders,
+
+            @Schema(description = "Số đơn trễ trong kỳ")
+            long lateOrders,
+
+            @Schema(description = "Tỉ lệ trễ (%) = lateOrders / dueOrders, 1 chữ số thập phân; null khi dueOrders = 0", example = "12.5")
+            BigDecimal lateRatePercent,
+
+            @Schema(description = "Tổng tiền các đơn không hủy (đã gồm giảm giá, phụ phí)")
+            BigDecimal ordersTotalAmount,
+
+            @Schema(description = "Tổng thành tiền các dòng dịch vụ (chưa gồm giảm giá, phụ phí cấp đơn)")
+            BigDecimal itemsRevenue,
+
+            @Schema(description = "Số đơn (không hủy) và tiền thực thu theo kênh, luôn đủ ONLINE và OFFLINE, bỏ qua bộ lọc kênh")
+            List<ChannelOrders> byChannel
+    ) {}
+
+    @Schema(description = "Tổng đơn kỳ liền trước")
+    public record Previous(long totalOrders) {}
+
+    public record CancelReasonCount(String code, String label, long count) {}
+
+    @Schema(description = "Thời gian xử lý; các giá trị null khi không có mẫu")
+    public record Processing(long completedOrders, BigDecimal avgHours, BigDecimal medianHours,
+                             long onTimeOrders, BigDecimal onTimeRatePercent) {}
+
+    public record WashModeTotals(Long washModeId, String washModeName, long orders, BigDecimal amount) {}
+
+    public record Online(long requests, long confirmed, long cancelled, BigDecimal confirmRatePercent,
+                         BigDecimal avgConfirmMinutes) {}
+
+    @Schema(description = "Số đơn và tiền thực thu của một kênh")
+    public record ChannelOrders(OrderChannel channel, long orders, BigDecimal revenue) {}
+
+    @Schema(description = "Số đơn của một trạng thái")
+    public record StatusCount(
+            String status,
+            String description,
+            long count
+    ) {}
+
+    @Schema(description = "Doanh thu của một dịch vụ")
+    public record ServiceRevenue(
+            @Schema(description = "Id dịch vụ, null với dòng không gắn dịch vụ")
+            Long serviceId,
+
+            String serviceCode,
+
+            @Schema(description = "Tên dịch vụ; dòng không gắn dịch vụ có tên \"Khác\"")
+            String serviceName,
+
+            @Schema(description = "Số đơn có dùng dịch vụ này")
+            long orderCount,
+
+            @Schema(description = "Tổng thành tiền các dòng của dịch vụ")
+            BigDecimal revenue,
+
+            @Schema(description = "Tổng khối lượng / số lượng tính tiền", example = "742.5")
+            BigDecimal quantity,
+
+            @Schema(description = "Đơn vị của dịch vụ: KG, PIECE, SET, PRODUCT; null với dòng \"Khác\"")
+            String unit
+    ) {}
+}

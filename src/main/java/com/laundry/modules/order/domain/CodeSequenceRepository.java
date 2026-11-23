@@ -1,13 +1,13 @@
 package com.laundry.modules.order.domain;
 
 import jakarta.persistence.LockModeType;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
 import java.time.LocalDate;
 import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface CodeSequenceRepository extends JpaRepository<CodeSequence, CodeSequenceId> {
 
@@ -17,5 +17,10 @@ public interface CodeSequenceRepository extends JpaRepository<CodeSequence, Code
             @Param("seqType") String seqType,
             @Param("seqDate") LocalDate seqDate
     );
-}
 
+    /** Tạo dòng đếm của ngày nếu chưa có; giao dịch đồng thời chờ rồi bỏ qua thay vì vỡ PK. */
+    @Modifying
+    @Query(value = "INSERT INTO code_sequences (seq_type, seq_date, last_number) VALUES (:seqType, :seqDate, 0) "
+            + "ON CONFLICT (seq_type, seq_date) DO NOTHING", nativeQuery = true)
+    int insertIfAbsent(@Param("seqType") String seqType, @Param("seqDate") LocalDate seqDate);
+}

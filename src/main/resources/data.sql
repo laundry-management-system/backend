@@ -32,11 +32,42 @@ SELECT v.* FROM (VALUES
 ) AS v
 WHERE NOT EXISTS (SELECT 1 FROM services);
 
+-- Hình thức giặt mẫu + giá DV01-DV10 (Giặt nhanh = giá + phụ phí cũ; NULL = dịch vụ không có giặt nhanh).
+-- Chỉ nạp khi chưa có hình thức nào và chưa có đơn nào, để không chạm DB thật đã có đơn.
+WITH m AS (
+    INSERT INTO wash_modes (name, completion_hours, active, is_default, created_at, updated_at)
+    SELECT v.* FROM (VALUES
+        ('Tiêu chuẩn', 24, true, true, NOW(), NOW()),
+        ('Giặt nhanh', 6, true, false, NOW(), NOW())
+    ) AS v
+    WHERE NOT EXISTS (SELECT 1 FROM wash_modes) AND NOT EXISTS (SELECT 1 FROM orders)
+    RETURNING id, is_default
+)
+INSERT INTO service_wash_modes (service_id, wash_mode_id, price, created_at, updated_at)
+SELECT s.id, m.id, CASE WHEN m.is_default THEN p.std ELSE p.express END, NOW(), NOW()
+FROM m
+JOIN (VALUES
+    ('DV01', 30000, 40000), ('DV02', 45000, 60000), ('DV03', 10000, 15000), ('DV04', 120000, 170000),
+    ('DV05', 80000, 100000), ('DV06', 60000, NULL), ('DV07', 100000, NULL), ('DV08', 60000, 90000),
+    ('DV09', 70000, NULL), ('DV10', 80000, NULL)
+) AS p(code, std, express) ON true
+JOIN services s ON s.service_code = p.code
+WHERE m.is_default OR p.express IS NOT NULL;
+UPDATE wash_modes SET code = 'HT' || lpad(id::text, 2, '0') WHERE code IS NULL;
+
 INSERT INTO users (id, employee_code, full_name, phone, email, username, password_hash, role, status, hired_date, created_at, updated_at)
 VALUES (0, 'NV00', 'system', '0000000000', 'system@gmail.com', 'system',
         '$2a$10$khyNcyj/YzTH/aSq7TC3w..90d3JmpNfjuCSfvbSiSqV8zqPjW8A6',
         'ADMIN', 'INACTIVE', CURRENT_DATE, NOW(), NOW())
 ON CONFLICT (username) DO NOTHING;
+
+-- Điều khoản bồi thường dạng chữ đã thay bằng hệ số K + mức trần; dòng cũ làm enum SettingKey không đọc được
+DELETE FROM settings WHERE setting_key = 'COMPENSATION_TERMS';
+
+-- ddl-auto không cập nhật CHECK của enum cũ; bỏ nếu có để thêm STORE_PHONE, SERVICE_AREA_MANAGE, SERVICE_AREA
+ALTER TABLE settings   DROP CONSTRAINT IF EXISTS settings_setting_key_check;
+ALTER TABLE audit_logs DROP CONSTRAINT IF EXISTS audit_logs_action_check;
+ALTER TABLE audit_logs DROP CONSTRAINT IF EXISTS audit_logs_entity_type_check;
 
 INSERT INTO settings (setting_key, setting_value, description, updated_by, updated_at)
 VALUES
@@ -51,11 +82,57 @@ VALUES
     ('BANK_ACCOUNT_NO', '0000000000', 'Số tài khoản ngân hàng nhận thanh toán', NULL, NOW()),
     ('BANK_ACCOUNT_NAME', 'CHU TIEM GIAT UI', 'Tên chủ tài khoản ngân hàng nhận thanh toán', NULL, NOW()),
 
-    ('COMPENSATION_TERMS', '100000', 'Mức bồi thường mặc định khi xảy ra sự cố làm mất hoặc hư hỏng đồ', NULL, NOW()),
+    ('COMPENSATION_MULTIPLIER', '10', 'Hệ số bồi thường K: tối đa K lần giá dịch vụ của món', NULL, NOW()),
+    ('COMPENSATION_CAP_PER_ITEM', '500000', 'Mức trần bồi thường mỗi món (đ)', NULL, NOW()),
     ('STORAGE_DAYS', '30', 'Số ngày lưu trữ đồ sau khi hoàn thành đơn hàng', NULL, NOW()),
 
     ('STORE_NAME', 'Laundry Shop', 'Tên cửa hàng giặt ủi', NULL, NOW()),
     ('STORE_ADDRESS', 'Chưa cập nhật', 'Địa chỉ cửa hàng giặt ủi', NULL, NOW()),
+    ('STORE_PHONE', '', 'Số điện thoại cửa hàng (10 chữ số, bắt đầu bằng 0)', NULL, NOW()),
 
-    ('WHITES_FEE', '80000', 'Phụ phí giặt riêng đồ trắng (đ/đơn)', NULL, NOW())
+    ('WHITES_FEE', '80000', 'Phụ phí giặt riêng đồ trắng (đ/đơn)', NULL, NOW()),
+
+    ('SHIFT_WARN_HOURS', '14', 'Cảnh báo ca mở quá số giờ này mà chưa kết', NULL, NOW()),
+
+    ('BOOKING_ENABLED', 'true', 'Nhận đặt đơn online (true: bật, false: tạm ngừng)', NULL, NOW()),
+    ('BOOKING_DELIVERY_ENABLED', 'true', 'Nhận lấy và giao tận nơi cho đơn đặt online (true: bật, false: tắt)', NULL, NOW()),
+    ('BOOKING_MIN_LEAD_HOURS', '1', 'Số giờ đặt trước tối thiểu so với giờ hẹn của yêu cầu đặt đơn', NULL, NOW()),
+    ('BOOKING_MAX_OPEN_PER_CUSTOMER', '10', 'Số yêu cầu đặt đơn chưa đóng tối đa của mỗi khách', NULL, NOW()),
+    ('BOOKING_PICKUP_MIN_AMOUNT', '100000', 'Tiền hàng tạm tính tối thiểu để được lấy tận nơi (đ)', NULL, NOW())
 ON CONFLICT (setting_key) DO NOTHING;
+
+-- bỏ khoảng cách giờ trả cũ; enum không còn khóa này nên xóa dòng cũ để đọc bảng settings không lỗi
+DELETE FROM settings WHERE setting_key IN ('BOOKING_RETURN_GAP_HOURS_NORMAL', 'BOOKING_RETURN_GAP_HOURS_EXPRESS');
+
+UPDATE settings SET setting_value='10' WHERE setting_key='BOOKING_MAX_OPEN_PER_CUSTOMER' AND setting_value='2' AND updated_by IS NULL;
+
+-- Tối đa một ca đang mở (BR-K01); Hibernate ddl-auto không tạo được index một phần
+CREATE UNIQUE INDEX IF NOT EXISTS uk_shifts_one_open ON shifts ((true)) WHERE status = 'OPEN';
+CREATE INDEX IF NOT EXISTS idx_payments_shift ON payments (shift_id);
+CREATE INDEX IF NOT EXISTS idx_payments_resolved_shift ON payments (resolved_shift_id);
+
+-- Tên khu vực không trùng, không phân biệt hoa thường; chặn cả khi hai Admin thêm cùng lúc (FR-029e)
+CREATE UNIQUE INDEX IF NOT EXISTS uk_service_areas_name_ci ON service_areas (lower(name));
+CREATE UNIQUE INDEX IF NOT EXISTS uk_wash_modes_name_ci ON wash_modes (lower(name));
+CREATE UNIQUE INDEX IF NOT EXISTS uk_wash_modes_code ON wash_modes (code);
+-- Đúng một hình thức mặc định (FR-001c); chặn cả khi hai Admin đổi mặc định cùng lúc
+CREATE UNIQUE INDEX IF NOT EXISTS uk_wash_modes_single_default ON wash_modes (is_default) WHERE is_default;
+-- đơn mới có order_type NULL nên uk_orders_intake_request_type không còn chặn trùng; một lượt nhận = một đơn.
+CREATE UNIQUE INDEX IF NOT EXISTS uk_orders_intake_request_new ON orders (intake_request_id) WHERE order_type IS NULL AND intake_request_id IS NOT NULL;
+
+-- Tài khoản khách: hồ sơ cũ là do nhân viên tạo; enum lưu dạng chuỗi nên bỏ CHECK để thêm giá trị sau không vỡ
+UPDATE customers SET source = 'COUNTER' WHERE source IS NULL;
+ALTER TABLE customers DROP CONSTRAINT IF EXISTS customers_source_check;
+ALTER TABLE customer_registrations DROP CONSTRAINT IF EXISTS customer_registrations_status_check;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_customers_email_ci ON customers (lower(email)) WHERE email IS NOT NULL;
+-- Chỉ yêu cầu đang chờ mới giữ SĐT/email; yêu cầu bị từ chối thì đăng ký lại được
+CREATE UNIQUE INDEX IF NOT EXISTS uk_customer_registrations_pending_phone ON customer_registrations (phone) WHERE status = 'PENDING';
+CREATE UNIQUE INDEX IF NOT EXISTS uk_customer_registrations_pending_email ON customer_registrations (lower(email)) WHERE status = 'PENDING' AND email IS NOT NULL;
+-- Yêu cầu chờ tạo trước khi hồ sơ được gắn lúc đăng ký: gắn vào hồ sơ cùng SĐT
+UPDATE customer_registrations r SET customer_id = c.id FROM customers c
+    WHERE r.status = 'PENDING' AND r.customer_id IS NULL AND c.phone = r.phone;
+
+-- 029: đơn online (enum mở rộng, received_at NULL tới khi nhận đồ)
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+ALTER TABLE order_status_history DROP CONSTRAINT IF EXISTS order_status_history_action_type_check;
+ALTER TABLE orders ALTER COLUMN received_at DROP NOT NULL;

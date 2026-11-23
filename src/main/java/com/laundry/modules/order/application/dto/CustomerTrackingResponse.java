@@ -1,65 +1,33 @@
 package com.laundry.modules.order.application.dto;
 
+import com.laundry.modules.order.domain.DropoffStatus;
 import com.laundry.modules.order.domain.Order;
+import com.laundry.modules.order.domain.OrderFulfillment;
 import com.laundry.modules.order.domain.OrderStatus;
-import com.laundry.modules.order.domain.OrderType;
-import com.laundry.modules.order.domain.PaymentStatus;
-import com.laundry.modules.order.domain.ServiceType;
+import com.laundry.modules.order.domain.ReturnStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
-
 import java.math.BigDecimal;
-import java.time.Instant;
-import java.util.List;
 
-@Schema(description = "Thông tin tra cứu tiến độ giặt dành cho khách hàng (BM6, BR-A05)")
+/** Tra cứu công khai: chỉ danh sách trắng FR-028a; không bao giờ có địa chỉ, liên hệ, lý do / ghi chú nội bộ. */
+@Schema(description = "Tra cứu đơn công khai theo SĐT (FR-028a)")
 public record CustomerTrackingResponse(
         String orderCode,
-        String customerName,
-        ServiceType serviceType,
-        String serviceName,
-        BigDecimal totalWeight,
-        BigDecimal totalAmount,
         OrderStatus status,
-        String statusDescription,
-        PaymentStatus paymentStatus,
-        OrderType orderType,
-        String shelfLocation,
-        Instant receivedAt,
-        Instant dueAt,
-        Instant completedAt,
-        Instant deliveredAt,
-        String note,
-        List<OrderItemDto> items,
-        List<OrderStatusHistoryResponse> timeline
+        DropoffStatus dropoffStatus,
+        ReturnStatus returnStatus,
+        BigDecimal pickupFee,
+        BigDecimal deliveryFee,
+        String pickupTrackingCode,
+        String deliveryTrackingCode,
+        String customerRejectReason
 ) {
     public static CustomerTrackingResponse from(Order order) {
-        List<OrderItemDto> itemDtos = order.getItems() != null
-                ? order.getItems().stream().map(OrderItemDto::from).toList()
-                : List.of();
-
-        List<OrderStatusHistoryResponse> timeline = order.getHistoryList() != null
-                ? order.getHistoryList().stream().map(OrderStatusHistoryResponse::from).toList()
-                : List.of();
-
-        return new CustomerTrackingResponse(
-                order.getOrderCode(),
-                order.getCustomerName(),
-                order.getServiceType(),
-                order.getServiceType() != null ? order.getServiceType().getDisplayName() : null,
-                order.getTotalWeight(),
-                order.getTotalAmount(),
-                order.getStatus(),
-                order.getStatus().getDescription(),
-                order.getPaymentStatus(),
-                order.getOrderType(),
-                order.getShelfLocation(),
-                order.getReceivedAt(),
-                order.getDueAt(),
-                order.getCompletedAt(),
-                order.getDeliveredAt(),
-                order.getNote(),
-                itemDtos,
-                timeline
-        );
+        OrderFulfillment f = order.getFulfillment();
+        if (f == null) {
+            return new CustomerTrackingResponse(order.getOrderCode(), order.getStatus(), null, null, null, null, null, null, null);
+        }
+        return new CustomerTrackingResponse(order.getOrderCode(), order.getStatus(), f.getDropoffStatus(),
+                f.getReturnStatus(), f.getPickupFee(), f.getDeliveryFee(),
+                f.getPickupTrackingCode(), f.getDeliveryTrackingCode(), f.getCustomerRejectReason());
     }
 }
