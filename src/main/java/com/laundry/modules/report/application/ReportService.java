@@ -1,32 +1,49 @@
 package com.laundry.modules.report.application;
 
+import com.laundry.modules.order.domain.CancelReason;
 import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.order.domain.OrderStatus;
 import com.laundry.modules.payments.application.port.OverdueDaysProvider;
 import com.laundry.modules.payments.domain.PaymentMethod;
-import com.laundry.modules.report.application.dto.DashboardResponse;
+import com.laundry.modules.report.application.dto.CustomerReportResponse;
+import com.laundry.modules.report.application.dto.OperationsReportResponse;
 import com.laundry.modules.report.application.dto.OrderReportResponse;
+import com.laundry.modules.report.application.dto.OverviewReportResponse;
+import com.laundry.modules.report.application.dto.PromotionReportResponse;
 import com.laundry.modules.report.application.dto.RevenuePaymentResponse;
 import com.laundry.modules.report.application.dto.RevenueReportResponse;
 import com.laundry.modules.report.domain.Granularity;
 import com.laundry.modules.report.domain.ReportPeriod;
 import com.laundry.modules.report.domain.ReportQueryRepository;
-import com.laundry.modules.report.domain.ReportQueryRepository.ActiveOrderTotals;
+import com.laundry.modules.report.domain.ReportQueryRepository.CancelReasonCount;
 import com.laundry.modules.report.domain.ReportQueryRepository.ChannelOrderTotals;
-import com.laundry.modules.report.domain.ReportQueryRepository.DashboardOrderCounts;
+import com.laundry.modules.report.domain.ReportQueryRepository.CountPair;
+import com.laundry.modules.report.domain.ReportQueryRepository.CustomerCohort;
+import com.laundry.modules.report.domain.ReportQueryRepository.CustomerSpendingRecord;
+import com.laundry.modules.report.domain.ReportQueryRepository.DueLateCounts;
+import com.laundry.modules.report.domain.ReportQueryRepository.LiveOrderCounts;
+import com.laundry.modules.report.domain.ReportQueryRepository.OnlineFunnel;
 import com.laundry.modules.report.domain.ReportQueryRepository.OrderPeriodCount;
 import com.laundry.modules.report.domain.ReportQueryRepository.OrderStatusCount;
+import com.laundry.modules.report.domain.ReportQueryRepository.OrderSummaryCounts;
+import com.laundry.modules.report.domain.ReportQueryRepository.ProcessingStats;
 import com.laundry.modules.report.domain.ReportQueryRepository.RevenueRecord;
+import com.laundry.modules.report.domain.ReportQueryRepository.RevenueTotals;
 import com.laundry.modules.report.domain.ReportQueryRepository.ServiceRevenueRecord;
+import com.laundry.modules.report.domain.ReportQueryRepository.StoredOrders;
+import com.laundry.modules.report.domain.ReportQueryRepository.VoucherRevenueRecord;
+import com.laundry.modules.report.domain.ReportQueryRepository.VoucherUsageRecord;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
@@ -38,26 +55,28 @@ import org.springframework.transaction.annotation.Transactional;
 @FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
 public class ReportService {
 
+    // shortcut: tuần tự; chuyển sang chạy song song nếu đo SC-005 vượt ngân sách
     ReportQueryRepository reportQueryRepository;
     OverdueDaysProvider overdueDaysProvider;
 
     /** BM11: doanh thu theo ngày/tháng, tách tiền mặt và chuyển khoản. */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, timeout = 30)
     public RevenueReportResponse getRevenueReport(String rawFrom, String rawTo, String rawGranularity,
                                                   OrderChannel channel) {
         return buildRevenueReport(ReportPeriod.of(rawFrom, rawTo), Granularity.parse(rawGranularity), channel);
     }
 
-    // shortcut: tối đa 1000 giao dịch, đủ cho xem chi tiết một ngày; khoảng dài cần phân trang
-    private static final int MAX_REVENUE_PAYMENTS = 1000;
+    // shortcut: tối đa 50.000 giao dịch, không phân trang; thêm phân trang nếu kỳ dài vượt ngưỡng
+    private static final int MAX_REVENUE_PAYMENTS = 50_000;
 
     /** Giao dịch tạo nên doanh thu của khoảng ngày, để đối chiếu với báo cáo. */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, timeout = 30)
     public List<RevenuePaymentResponse> getRevenuePayments(String rawFrom, String rawTo, OrderChannel channel) {
         ReportPeriod period = ReportPeriod.of(rawFrom, rawTo);
         return reportQueryRepository.findRevenuePayments(
                         period.startInstant(), period.endInstant(), channel, MAX_REVENUE_PAYMENTS)
-                .stream().map(RevenuePaymentResponse::from).toList();
+                .stream().map(RevenuePaymentResponse::from)
+                .sorted(Comparator.comparing(RevenuePaymentResponse::paidAt)).toList();
     }
 
     private RevenueReportResponse buildRevenueReport(ReportPeriod period, Granularity granularity,
@@ -121,6 +140,10 @@ public class ReportService {
             paymentCount += bucket.paymentCount;
         }
 
+        ReportPeriod prev = period.previous();
+        RevenueTotals totals = reportQueryRepository.sumRevenueTotals(
+                prev.startInstant(), period.startInstant(), period.endInstant(), channel);
+
         return new RevenueReportResponse(
                 period.from(), period.to(), granularity, rows,
                 new RevenueReportResponse.Summary(
@@ -128,11 +151,14 @@ public class ReportService {
                         channels.entrySet().stream()
                                 .map(e -> new RevenueReportResponse.ChannelRevenue(
                                         e.getKey(), e.getValue().total, e.getValue().paymentCount))
-                                .toList()));
+                                .toList(),
+                        totals.paidOrders()),
+                new RevenueReportResponse.Previous(prev.from(), prev.to(), totals.previousTotal(),
+                        totals.previousPaidOrders()));
     }
 
     /** BM12: số đơn, tỉ lệ trễ và doanh thu theo dịch vụ. */
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, timeout = 30)
     public OrderReportResponse getOrderReport(String rawFrom, String rawTo, String rawGranularity,
                                               OrderChannel channel) {
         ReportPeriod period = ReportPeriod.of(rawFrom, rawTo);
@@ -149,11 +175,40 @@ public class ReportService {
                         s.name(), s.getDescription(), counts.getOrDefault(s.name(), 0L)))
                 .toList();
 
-        long totalOrders = counts.values().stream().mapToLong(Long::longValue).sum();
-        long cancelledOrders = counts.getOrDefault(OrderStatus.CANCELLED.name(), 0L);
-        long activeOrders = totalOrders - cancelledOrders;
+        OrderSummaryCounts summary = reportQueryRepository.countOrderSummary(
+                period.previous().startInstant(), start, end, channel);
+        DueLateCounts dueLate = reportQueryRepository.countDueAndLate(start, end, channel);
 
-        ActiveOrderTotals totals = reportQueryRepository.findActiveOrderTotals(start, end, channel);
+        // Gộp theo code (null → OTHER), điền 0 cho code thiếu; sort ổn định nên bằng nhau giữ thứ tự enum
+        Map<String, Long> cancelCounts = new LinkedHashMap<>();
+        long onlineCancelled = 0;
+        for (CancelReasonCount c : reportQueryRepository.countCancelledByReason(start, end, channel)) {
+            cancelCounts.merge(c.code() == null ? CancelReason.OTHER.name() : c.code(), c.count(), Long::sum);
+            onlineCancelled += c.online();
+        }
+        List<OrderReportResponse.CancelReasonCount> cancelReasons = Arrays.stream(CancelReason.values())
+                .map(r -> new OrderReportResponse.CancelReasonCount(
+                        r.name(), r.getLabel(), cancelCounts.getOrDefault(r.name(), 0L)))
+                .sorted(Comparator.comparingLong(OrderReportResponse.CancelReasonCount::count).reversed())
+                .toList();
+        long cancelledOrders = cancelReasons.stream().mapToLong(OrderReportResponse.CancelReasonCount::count).sum();
+
+        ProcessingStats ps = reportQueryRepository.processingStats(start, end, channel);
+        OrderReportResponse.Processing processing = new OrderReportResponse.Processing(
+                ps.completedOrders(), oneDecimal(ps.avgHours()), oneDecimal(ps.medianHours()),
+                ps.onTimeOrders(), percent(ps.onTimeOrders(), ps.completedOrders()));
+
+        List<OrderReportResponse.WashModeTotals> byWashMode = reportQueryRepository
+                .sumOrdersByWashMode(start, end, channel).stream()
+                .map(w -> new OrderReportResponse.WashModeTotals(w.washModeId(), w.washModeName(), w.orders(), w.amount()))
+                .toList();
+
+        OrderReportResponse.Online online = null;
+        if (channel != OrderChannel.OFFLINE) {
+            OnlineFunnel f = reportQueryRepository.onlineFunnel(start, end);
+            online = new OrderReportResponse.Online(f.requests(), f.confirmed(), onlineCancelled,
+                    percent(f.confirmed(), f.requests()), oneDecimal(f.avgConfirmMinutes()));
+        }
 
         List<OrderReportResponse.ServiceRevenue> byService = reportQueryRepository.sumRevenueByService(start, end, channel)
                 .stream()
@@ -190,40 +245,170 @@ public class ReportService {
         return new OrderReportResponse(
                 period.from(), period.to(), granularity,
                 new OrderReportResponse.Summary(
-                        totalOrders, cancelledOrders, activeOrders,
-                        totals.lateOrders(), lateRate(totals.lateOrders(), activeOrders),
-                        totals.totalAmount(), itemsRevenue, byChannel),
+                        summary.received(), summary.delivered(), cancelledOrders, summary.active(),
+                        dueLate.due(), dueLate.late(), percent(dueLate.late(), dueLate.due()),
+                        summary.totalAmount(), itemsRevenue, byChannel),
+                new OrderReportResponse.Previous(summary.previousReceived()),
+                cancelReasons,
+                processing,
+                byWashMode,
+                online,
                 byStatus,
                 byService,
                 rows);
     }
 
-    /** Dashboard theo kỳ (giờ Việt Nam): số đơn, doanh thu, đơn trễ, đồ tồn, kèm kỳ liền trước để so sánh. */
-    @Transactional(readOnly = true)
-    public DashboardResponse getDashboard(ReportPeriod period) {
-        int storedAfterDays = overdueDaysProvider.getDays();
-        Instant storedBefore = Instant.now().minus(storedAfterDays, ChronoUnit.DAYS);
-
-        DashboardOrderCounts counts = reportQueryRepository.countDashboardOrders(
-                period.startInstant(), period.endInstant(), storedBefore);
-        // Dùng chung logic với BM11 để số doanh thu luôn khớp báo cáo doanh thu
-        RevenueReportResponse.Summary revenue = buildRevenueReport(period, Granularity.DAY, null).summary();
-
+    /** Tổng quan: số liệu hiện tại + bốn chỉ số kỳ so với kỳ liền trước; bỏ cả from/to = hôm nay. */
+    @Transactional(readOnly = true, timeout = 30)
+    public OverviewReportResponse getOverview(String rawFrom, String rawTo) {
+        ReportPeriod period = ReportPeriod.ofOptional(rawFrom, rawTo);
         ReportPeriod prev = period.previous();
-        long prevReceived = reportQueryRepository.countDashboardOrders(
-                prev.startInstant(), prev.endInstant(), storedBefore).received();
-        BigDecimal prevRevenue = buildRevenueReport(prev, Granularity.DAY, null).summary().total();
+        Instant from = period.startInstant();
+        Instant to = period.endInstant();
+        Instant prevFrom = prev.startInstant();
 
-        return new DashboardResponse(
-                period.from(),
-                period.to(),
-                new DashboardResponse.Orders(
-                        counts.received(), counts.cancelled(), counts.delivered(),
-                        counts.waiting(), counts.processing(), counts.readyForPickup(),
-                        counts.pendingConfirmation(), counts.awaitingDropoff()),
-                revenue,
-                new DashboardResponse.Alerts(counts.lateOrders(), counts.storedOrders(), storedAfterDays),
-                new DashboardResponse.Previous(prev.from(), prev.to(), prevReceived, prevRevenue));
+        OrderSummaryCounts orders = reportQueryRepository.countOrderSummary(prevFrom, from, to, null);
+        RevenueTotals revenue = reportQueryRepository.sumRevenueTotals(prevFrom, from, to, null);
+        CustomerCohort cohort = reportQueryRepository.customerCohort(prevFrom, from, to);
+        CountPair incidents = reportQueryRepository.countIncidents(prevFrom, from, to);
+
+        int storedAfterDays = overdueDaysProvider.getDays();
+        Instant now = Instant.now();
+        LiveOrderCounts live = reportQueryRepository.countLiveOrders();
+        StoredOrders stored = reportQueryRepository.findStoredOrders(now.minus(storedAfterDays, ChronoUnit.DAYS));
+
+        return new OverviewReportResponse(
+                period.from(), period.to(),
+                new OverviewReportResponse.Live(
+                        live.waiting(), live.processing(), live.readyForPickup(),
+                        live.pendingConfirmation(), live.awaitingDropoff(), live.lateOrders(),
+                        stored.total(), storedAfterDays,
+                        reportQueryRepository.findDueSoonOrders().stream()
+                                .map(d -> new OverviewReportResponse.DueSoon(
+                                        d.orderId(), d.orderCode(), d.customerName(), d.status(), d.dueAt()))
+                                .toList(),
+                        stored.rows().stream()
+                                .map(o -> new OverviewReportResponse.Stored(
+                                        o.orderId(), o.orderCode(), o.customerName(), o.readyAt(),
+                                        ChronoUnit.DAYS.between(o.readyAt(), now)))
+                                .toList()),
+                new OverviewReportResponse.Counts(
+                        orders.received(), revenue.total(), cohort.newCustomers(), incidents.current()),
+                new OverviewReportResponse.Counts(
+                        orders.previousReceived(), revenue.previousTotal(),
+                        cohort.previousNewCustomers(), incidents.previous()));
+    }
+
+    /** Vận hành: đơn theo nhân viên, ca làm, sự cố. Tổng ca tính từ chính shiftRows để luôn khớp bảng. */
+    @Transactional(readOnly = true, timeout = 30)
+    public OperationsReportResponse getOperationsReport(String rawFrom, String rawTo, String rawGranularity) {
+        ReportPeriod period = ReportPeriod.of(rawFrom, rawTo);
+        Granularity granularity = Granularity.parse(rawGranularity);
+        Instant from = period.startInstant();
+        Instant to = period.endInstant();
+
+        List<ReportQueryRepository.ShiftRow> shifts = reportQueryRepository.shiftRows(from, to);
+        BigDecimal difference = shifts.stream().map(ReportQueryRepository.ShiftRow::difference)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal handIn = shifts.stream().map(ReportQueryRepository.ShiftRow::handInCash)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        CountPair incidents = reportQueryRepository.countIncidents(period.previous().startInstant(), from, to);
+        ReportQueryRepository.IncidentPayout payout = reportQueryRepository.incidentPayouts(from, to);
+
+        return new OperationsReportResponse(
+                period.from(), period.to(), granularity,
+                reportQueryRepository.ordersByStaff(from, to).stream()
+                        .map(r -> new OperationsReportResponse.StaffOrders(r.username(), r.fullName(), r.orders()))
+                        .sorted(Comparator.comparingLong(OperationsReportResponse.StaffOrders::orders).reversed())
+                        .toList(),
+                new OperationsReportResponse.Shifts(
+                        shifts.size(),
+                        shifts.stream().filter(r -> r.difference().signum() < 0).count(),
+                        shifts.stream().filter(r -> r.difference().signum() > 0).count(),
+                        difference, handIn),
+                shifts.stream()
+                        .map(r -> new OperationsReportResponse.ShiftRow(r.shiftId(), r.code(), r.openedByName(),
+                                r.closedAt(), r.status(), r.difference(), r.handInCash()))
+                        .toList(),
+                new OperationsReportResponse.Incidents(
+                        incidents.current(),
+                        reportQueryRepository.incidentsByPeriod(from, to, granularity).stream()
+                                .map(r -> new OperationsReportResponse.PeriodCount(r.period(), r.received()))
+                                .toList(),
+                        reportQueryRepository.incidentsByType(from, to).stream()
+                                .sorted(Comparator.comparingLong(ReportQueryRepository.LabelCount::count).reversed())
+                                .map(r -> new OperationsReportResponse.TypeCount(r.label(), r.count()))
+                                .toList(),
+                        reportQueryRepository.incidentsByStatus(from, to).stream()
+                                .sorted(Comparator.comparingLong(ReportQueryRepository.LabelCount::count).reversed())
+                                .map(r -> new OperationsReportResponse.StatusCount(r.label(), r.count()))
+                                .toList(),
+                        new OperationsReportResponse.Payouts(payout.cash(), payout.bankTransfer())),
+                new OperationsReportResponse.Previous(incidents.previous()));
+    }
+
+    private static final int TOP_CUSTOMERS = 10;
+    // shortcut: tối đa 50.000 khách cho CSV, không phân trang; thêm phân trang nếu vượt ngưỡng
+    private static final int MAX_CUSTOMER_SPENDING = 50_000;
+
+    /** Khách mới / quay lại, số đăng ký và top khách chi tiêu. */
+    @Transactional(readOnly = true, timeout = 30)
+    public CustomerReportResponse getCustomerReport(String rawFrom, String rawTo) {
+        ReportPeriod period = ReportPeriod.of(rawFrom, rawTo);
+        Instant from = period.startInstant();
+        Instant to = period.endInstant();
+        CustomerCohort cohort = reportQueryRepository.customerCohort(period.previous().startInstant(), from, to);
+        return new CustomerReportResponse(
+                period.from(), period.to(), cohort.newCustomers(), cohort.returningCustomers(),
+                percent(cohort.returningCustomers(), cohort.newCustomers() + cohort.returningCustomers()),
+                reportQueryRepository.countRegistrations(from, to),
+                new CustomerReportResponse.Previous(cohort.previousNewCustomers()),
+                spendingRows(from, to, TOP_CUSTOMERS));
+    }
+
+    /** Chi tiêu mọi khách trong kỳ, chỉ để xuất CSV. */
+    @Transactional(readOnly = true, timeout = 30)
+    public List<CustomerReportResponse.CustomerSpendingRow> getCustomerSpending(String rawFrom, String rawTo) {
+        ReportPeriod period = ReportPeriod.of(rawFrom, rawTo);
+        return spendingRows(period.startInstant(), period.endInstant(), MAX_CUSTOMER_SPENDING);
+    }
+
+    private List<CustomerReportResponse.CustomerSpendingRow> spendingRows(Instant from, Instant to, int limit) {
+        return reportQueryRepository.topCustomers(from, to, limit).stream()
+                .map((CustomerSpendingRecord r) -> new CustomerReportResponse.CustomerSpendingRow(
+                        r.customerId(), r.customerCode(), r.customerName(), r.orderCount(), r.spent(), r.lastOrderAt()))
+                .toList();
+    }
+
+    /** Hiệu quả khuyến mãi theo mã voucher đã lưu trên đơn. */
+    @Transactional(readOnly = true, timeout = 30)
+    public PromotionReportResponse getPromotionReport(String rawFrom, String rawTo, OrderChannel channel) {
+        ReportPeriod period = ReportPeriod.of(rawFrom, rawTo);
+        Instant from = period.startInstant();
+        Instant to = period.endInstant();
+        Map<String, BigDecimal> revenueByCode = reportQueryRepository.voucherRevenue(from, to, channel).stream()
+                .collect(Collectors.toMap(VoucherRevenueRecord::voucherCode, VoucherRevenueRecord::revenue, BigDecimal::add));
+        Map<String, VoucherUsageRecord> usageByCode = reportQueryRepository.voucherUsage(from, to, channel).stream()
+                .collect(Collectors.toMap(VoucherUsageRecord::voucherCode, u -> u, (x, y) -> x));
+        // Doanh thu có thể đến từ đơn dùng voucher nhận ở kỳ trước nên lấy hợp mã của cả hai nguồn
+        List<PromotionReportResponse.VoucherRow> rows = Stream.concat(usageByCode.keySet().stream(), revenueByCode.keySet().stream())
+                .distinct()
+                .map(code -> {
+                    VoucherUsageRecord u = usageByCode.get(code);
+                    return new PromotionReportResponse.VoucherRow(
+                            code, u == null ? null : u.voucherId(), u == null ? 0 : u.uses(),
+                            u == null ? BigDecimal.ZERO : u.discountTotal(),
+                            revenueByCode.getOrDefault(code, BigDecimal.ZERO));
+                })
+                .sorted(Comparator.comparing(PromotionReportResponse.VoucherRow::revenue).reversed()
+                        .thenComparing(Comparator.comparingLong(PromotionReportResponse.VoucherRow::uses).reversed()))
+                .toList();
+        return new PromotionReportResponse(
+                period.from(), period.to(),
+                rows.stream().mapToLong(PromotionReportResponse.VoucherRow::uses).sum(),
+                rows.stream().map(PromotionReportResponse.VoucherRow::discountTotal).reduce(BigDecimal.ZERO, BigDecimal::add),
+                rows.stream().map(PromotionReportResponse.VoucherRow::revenue).reduce(BigDecimal.ZERO, BigDecimal::add),
+                rows);
     }
 
     private static OrderReportResponse.ServiceRevenue toServiceRevenue(ServiceRevenueRecord r) {
@@ -232,13 +417,13 @@ public class ReportService {
                 r.quantity(), r.unit());
     }
 
-    private static BigDecimal lateRate(long lateOrders, long activeOrders) {
-        if (activeOrders == 0) {
-            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        }
-        return BigDecimal.valueOf(lateOrders)
-                .multiply(BigDecimal.valueOf(100))
-                .divide(BigDecimal.valueOf(activeOrders), 2, RoundingMode.HALF_UP);
+    /** Phần trăm HALF_UP 1 chữ số; mẫu 0 → null. */
+    private static BigDecimal percent(long part, long whole) {
+        return whole == 0 ? null : BigDecimal.valueOf(part * 100).divide(BigDecimal.valueOf(whole), 1, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal oneDecimal(BigDecimal v) {
+        return v == null ? null : v.setScale(1, RoundingMode.HALF_UP);
     }
 
     private static final class Bucket {

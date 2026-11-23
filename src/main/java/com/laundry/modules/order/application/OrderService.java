@@ -551,7 +551,7 @@ public class OrderService {
     public OrderDetailResponse cancel(Long id, CancelOrderRequest request, String performedBy) {
         Order order = lockOrder(id);
         Map<String, Object> old = auditSnapshot(order);
-        order.cancel(request.customerReason(), request.reason(), performedBy);
+        order.cancel(request.reasonCode(), request.customerReason(), request.reason(), performedBy);
         voucherService.releaseVoucher(order.getVoucherId());
         Order saved = orderRepository.saveAndFlush(order);
         if (saved.getChannel() == OrderChannel.ONLINE) {
@@ -572,7 +572,7 @@ public class OrderService {
     public OrderDetailResponse reject(Long id, RejectOrderRequest request, String performedBy) {
         Order order = lockOrder(id);
         Map<String, Object> old = auditSnapshot(order);
-        order.reject(request.customerReason(), request.reason(), performedBy);
+        order.reject(request.reasonCode(), request.customerReason(), request.reason(), performedBy);
         voucherService.releaseVoucher(order.getVoucherId());
         return toDetail(audited(AuditAction.ORDER_REJECT, order, old, request.reason()));
     }

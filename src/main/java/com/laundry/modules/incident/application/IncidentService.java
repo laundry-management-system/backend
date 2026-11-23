@@ -115,8 +115,7 @@ public class IncidentService {
         long pending = stats.counts().get(IncidentStatus.PENDING);
         long approved = stats.counts().get(IncidentStatus.APPROVED);
         long rejected = stats.counts().get(IncidentStatus.REJECTED);
-        return new IncidentStatsResponse(pending, approved, rejected, pending + approved + rejected,
-                stats.paidCash(), stats.paidTransfer());
+        return new IncidentStatsResponse(pending, approved, rejected, pending + approved + rejected);
     }
 
     @Transactional

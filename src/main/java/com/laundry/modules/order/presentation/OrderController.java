@@ -227,7 +227,7 @@ public class OrderController {
         return orderService.adjustPrice(id, request, staff);
     }
 
-    @Operation(summary = "Hủy đơn hàng khi Mới nhận kèm lý do (UC05 / BR-D05)")
+    @Operation(summary = "Hủy đơn hàng trước khi nhận đồ, kèm mã lý do (UC05 / BR-D05)")
     @PostMapping("/{id}/cancel")
     public OrderDetailResponse cancel(
             @PathVariable Long id,

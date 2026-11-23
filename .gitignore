@@ -35,3 +35,4 @@ build/
 
 ### File upload (documents) ###
 uploads/
+src/main/resources/application-dev.yml

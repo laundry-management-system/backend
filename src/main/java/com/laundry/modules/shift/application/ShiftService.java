@@ -27,7 +27,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
-import java.util.EnumSet;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -165,31 +164,13 @@ public class ShiftService {
     }
 
     @Transactional(readOnly = true)
-    public ShiftSummaryResponse summary(String from, String to) {
-        Instant[] range = dayRange(from, to);
+    public ShiftSummaryResponse summary() {
         int warnAfterHours = lookupQuery.warnAfterHours();
         ShiftSummaryResponse.OpenShift open = shiftRepository.findByStatus(ShiftStatus.OPEN)
                 .map(s -> new ShiftSummaryResponse.OpenShift(s.getId(), s.getCode(),
                         lookupQuery.userName(s.getOpenedBy()), s.getOpenedAt(), isOverdue(s, warnAfterHours)))
                 .orElse(null);
-        // shortcut: cộng trong bộ nhớ các ca đã kết của kỳ (vài chục ca/tháng); nhiều hơn thì đổi sang SUM ở DB
-        List<Shift> closed = shiftRepository.findByOpenedAtGreaterThanEqualAndOpenedAtLessThanAndStatusIn(
-                range[0], range[1], EnumSet.of(ShiftStatus.CLOSED, ShiftStatus.APPROVED));
-        BigDecimal differenceTotal = BigDecimal.ZERO;
-        BigDecimal handInTotal = BigDecimal.ZERO;
-        long shortCount = 0;
-        long overCount = 0;
-        for (Shift s : closed) {
-            differenceTotal = differenceTotal.add(s.getDifference());
-            handInTotal = handInTotal.add(s.getHandInCash());
-            if (s.getDifference().signum() < 0) {
-                shortCount++;
-            } else if (s.getDifference().signum() > 0) {
-                overCount++;
-            }
-        }
-        return new ShiftSummaryResponse(open, shiftRepository.countByStatus(ShiftStatus.CLOSED), differenceTotal,
-                shortCount, overCount, handInTotal);
+        return new ShiftSummaryResponse(open, shiftRepository.countByStatus(ShiftStatus.CLOSED));
     }
 
     @Transactional

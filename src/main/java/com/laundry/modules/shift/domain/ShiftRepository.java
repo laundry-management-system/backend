@@ -2,8 +2,6 @@ package com.laundry.modules.shift.domain;
 
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
-import java.util.Collection;
-import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -31,9 +29,6 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
 
     Page<Shift> findByOpenedAtGreaterThanEqualAndOpenedAtLessThanAndStatus(Instant from, Instant to,
                                                                            ShiftStatus status, Pageable pageable);
-
-    List<Shift> findByOpenedAtGreaterThanEqualAndOpenedAtLessThanAndStatusIn(Instant from, Instant to,
-                                                                             Collection<ShiftStatus> statuses);
 
     long countByStatus(ShiftStatus status);
 }

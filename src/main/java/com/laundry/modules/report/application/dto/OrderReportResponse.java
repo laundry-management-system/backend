@@ -20,6 +20,19 @@ public record OrderReportResponse(
 
         Summary summary,
 
+        Previous previous,
+
+        @Schema(description = "Lý do hủy, luôn đủ mọi mã, sắp theo count giảm dần rồi thứ tự danh mục")
+        List<CancelReasonCount> cancelReasons,
+
+        Processing processing,
+
+        @Schema(description = "Đơn nhận theo hình thức giặt, sắp theo amount giảm dần")
+        List<WashModeTotals> byWashMode,
+
+        @Schema(description = "Phễu đơn online; null khi lọc kênh OFFLINE")
+        Online online,
+
         @Schema(description = "Số đơn theo từng trạng thái đã nhận đồ (gồm Đã hủy, không có thì 0)")
         List<StatusCount> byStatus,
 
@@ -43,16 +56,22 @@ public record OrderReportResponse(
             @Schema(description = "Tổng số đơn nhận trong kỳ, gồm cả đơn đã hủy")
             long totalOrders,
 
-            @Schema(description = "Số đơn đã hủy")
+            @Schema(description = "Số đơn có delivered_at trong kỳ")
+            long deliveredOrders,
+
+            @Schema(description = "Số đơn có sự kiện hủy trong kỳ")
             long cancelledOrders,
 
-            @Schema(description = "Số đơn không bị hủy (cơ sở tính tỉ lệ trễ)")
+            @Schema(description = "Đơn nhận trong kỳ, hiện chưa DELIVERED / CANCELLED")
             long activeOrders,
 
-            @Schema(description = "Số đơn trễ: đơn không hủy mà thời điểm hoàn thành (hoặc hiện tại nếu chưa hoàn thành) vượt ngày hẹn")
+            @Schema(description = "Số đơn đến hạn trong kỳ")
+            long dueOrders,
+
+            @Schema(description = "Số đơn trễ trong kỳ")
             long lateOrders,
 
-            @Schema(description = "Tỉ lệ trễ (%) = lateOrders / activeOrders, 2 chữ số thập phân", example = "12.50")
+            @Schema(description = "Tỉ lệ trễ (%) = lateOrders / dueOrders, 1 chữ số thập phân; null khi dueOrders = 0", example = "12.5")
             BigDecimal lateRatePercent,
 
             @Schema(description = "Tổng tiền các đơn không hủy (đã gồm giảm giá, phụ phí)")
@@ -64,6 +83,20 @@ public record OrderReportResponse(
             @Schema(description = "Số đơn (không hủy) và tiền thực thu theo kênh, luôn đủ ONLINE và OFFLINE, bỏ qua bộ lọc kênh")
             List<ChannelOrders> byChannel
     ) {}
+
+    @Schema(description = "Tổng đơn kỳ liền trước")
+    public record Previous(long totalOrders) {}
+
+    public record CancelReasonCount(String code, String label, long count) {}
+
+    @Schema(description = "Thời gian xử lý; các giá trị null khi không có mẫu")
+    public record Processing(long completedOrders, BigDecimal avgHours, BigDecimal medianHours,
+                             long onTimeOrders, BigDecimal onTimeRatePercent) {}
+
+    public record WashModeTotals(Long washModeId, String washModeName, long orders, BigDecimal amount) {}
+
+    public record Online(long requests, long confirmed, long cancelled, BigDecimal confirmRatePercent,
+                         BigDecimal avgConfirmMinutes) {}
 
     @Schema(description = "Số đơn và tiền thực thu của một kênh")
     public record ChannelOrders(OrderChannel channel, long orders, BigDecimal revenue) {}

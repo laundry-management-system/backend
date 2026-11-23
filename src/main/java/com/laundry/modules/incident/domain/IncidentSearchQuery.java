@@ -7,7 +7,6 @@ import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -26,7 +25,7 @@ public class IncidentSearchQuery {
 
     private final EntityManager entityManager;
 
-    public record Stats(Map<IncidentStatus, Long> counts, BigDecimal paidCash, BigDecimal paidTransfer) {
+    public record Stats(Map<IncidentStatus, Long> counts) {
     }
 
     public Page<Incident> search(IncidentFilter filter, Pageable pageable) {
@@ -60,25 +59,7 @@ public class IncidentSearchQuery {
         for (Object[] row : entityManager.createQuery(byStatus).getResultList()) {
             counts.put((IncidentStatus) row[0], (Long) row[1]);
         }
-
-        CriteriaQuery<Object[]> paid = cb.createQuery(Object[].class);
-        Root<Incident> paidRoot = paid.from(Incident.class);
-        List<Predicate> paidWhere = new ArrayList<>(List.of(predicates(cb, paidRoot, filter, false)));
-        paidWhere.add(cb.isNotNull(paidRoot.get("paidAt")));
-        paid.multiselect(paidRoot.get("payoutMethod"), cb.sum(paidRoot.<BigDecimal>get("payoutAmount")))
-                .where(paidWhere.toArray(Predicate[]::new))
-                .groupBy(paidRoot.get("payoutMethod"));
-        BigDecimal cash = BigDecimal.ZERO;
-        BigDecimal transfer = BigDecimal.ZERO;
-        for (Object[] row : entityManager.createQuery(paid).getResultList()) {
-            BigDecimal sum = row[1] == null ? BigDecimal.ZERO : (BigDecimal) row[1];
-            if (row[0] == PayoutMethod.CASH) {
-                cash = sum;
-            } else if (row[0] == PayoutMethod.BANK_TRANSFER) {
-                transfer = sum;
-            }
-        }
-        return new Stats(counts, cash, transfer);
+        return new Stats(counts);
     }
 
     private Predicate[] predicates(CriteriaBuilder cb, Root<Incident> root, IncidentFilter f, boolean withStatus) {

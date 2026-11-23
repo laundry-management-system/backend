@@ -564,20 +564,22 @@ public class Order extends BaseEntity {
     }
 
     /** Chỉ cancel / reject vào được CANCELLED, và chỉ khi đơn chưa nhận đồ (FR-032). */
-    public void cancel(String customerReason, String reason, String performedBy) {
+    public void cancel(CancelReason reasonCode, String customerReason, String reason, String performedBy) {
         if (!this.status.isBeforeDropoff()) {
             throw new BusinessException("Chỉ hủy được đơn chưa nhận đồ");
         }
-        String historyReason = reason;
-        if (this.channel == OrderChannel.ONLINE) {
-            if (customerReason == null || customerReason.isBlank()) {
-                throw new BusinessException("Bắt buộc phải nhập lý do hủy gửi khách");
+        if (reasonCode == null) {
+            throw new BusinessException("Chọn lý do hủy", "reasonCode");
+        }
+        String historyReason = reasonCode.getLabel();
+        if (reasonCode == CancelReason.OTHER) {
+            historyReason = reason == null ? "" : reason.trim();
+            if (historyReason.isEmpty() || historyReason.length() > 500) {
+                throw new BusinessException("Nhập lý do hủy khác", "reason");
             }
-            if (historyReason == null || historyReason.isBlank()) {
-                historyReason = "Hủy đơn online";
-            }
-        } else if (reason == null || reason.isBlank()) {
-            throw new BusinessException("Bắt buộc phải nhập lý do hủy đơn hàng (BR-D05)");
+        }
+        if (this.channel == OrderChannel.ONLINE && (customerReason == null || customerReason.isBlank())) {
+            throw new BusinessException("Bắt buộc phải nhập lý do hủy gửi khách");
         }
         OrderStatus oldStatus = this.status;
         this.status = OrderStatus.CANCELLED;
@@ -592,6 +594,7 @@ public class Order extends BaseEntity {
             }
         }
         addHistory(HistoryActionType.CANCELLED, oldStatus.name(), OrderStatus.CANCELLED.name(), historyReason, performedBy);
+        this.historyList.get(this.historyList.size() - 1).setReasonCode(reasonCode);
     }
 
     public void confirm(String performedBy) {
@@ -606,9 +609,9 @@ public class Order extends BaseEntity {
     }
 
     /** Từ chối = hủy từ Chờ xác nhận; lý do nội bộ chỉ vào lịch sử (R14). */
-    public void reject(String customerReason, String reason, String performedBy) {
+    public void reject(CancelReason reasonCode, String customerReason, String reason, String performedBy) {
         requirePendingOnline();
-        cancel(customerReason, reason == null || reason.isBlank() ? "Từ chối đơn online" : reason.trim(), performedBy);
+        cancel(reasonCode, customerReason, reason, performedBy);
     }
 
     /** Giờ hẹn đã được service kiểm bằng {@link AppointmentRules} (cần setting giờ mở cửa); null = giữ nguyên. */

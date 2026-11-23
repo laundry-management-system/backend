@@ -6,7 +6,7 @@
     },
     "servers": [
         {
-            "url": "http://localhost:8080",
+            "url": "http://localhost:8081",
             "description": "Generated server url"
         }
     ],
@@ -2014,12 +2014,8 @@
                                 }
                             }
                         }
-                    },
-                    "400": {
-                        "description": "Lỗi field `dueAt` \"Hạn trả phải từ <minDue> trở đi\" khi trễ giờ hẹn và hạn trả hiện tại sớm hơn minDue mà dueAt sớm hơn minDue; \"Hạn trả hiện tại vẫn kịp nên không đổi được\" ở mọi ca khác (đúng hẹn, hoặc trễ mà hạn trả hiện tại vẫn ≥ minDue) khi dueAt khác hạn trả hiện tại."
                     }
-                },
-                "description": "minDue = max(dueAt, giờ nhận + washModeHours, làm tròn 30 phút trong giờ mở cửa) nếu nhận muộn hơn appointmentAt, ngược lại = dueAt. dueAt bỏ trống = minDue; muộn hơn thì nhận; khác dueAt cũ thì ghi RESCHEDULE (FR-039)."
+                }
             }
         },
         "/api/orders/{id}/confirm": {
@@ -2101,7 +2097,7 @@
                 "tags": [
                     "Order Management"
                 ],
-                "summary": "Hủy đơn hàng khi Mới nhận kèm lý do (UC05 / BR-D05)",
+                "summary": "Hủy đơn hàng trước khi nhận đồ, kèm mã lý do (UC05 / BR-D05)",
                 "operationId": "cancel",
                 "parameters": [
                     {
@@ -3810,24 +3806,6 @@
                     "Shifts"
                 ],
                 "operationId": "summary",
-                "parameters": [
-                    {
-                        "name": "from",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "to",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -4188,6 +4166,108 @@
                 }
             }
         },
+        "/api/reports/promotions": {
+            "get": {
+                "tags": [
+                    "Report Management"
+                ],
+                "summary": "Báo cáo khuyến mãi",
+                "description": "Lượt dùng, tổng giảm giá và doanh thu theo mã voucher đã lưu trên đơn, trong khoảng ngày (giờ Việt Nam). Sắp theo doanh thu giảm dần, rồi lượt dùng. Khoảng tối đa 366 ngày.",
+                "operationId": "getPromotionReport",
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "description": "Ngày bắt đầu, dạng yyyy-MM-dd",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "2026-10-01"
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "description": "Ngày kết thúc (gồm cả ngày này), dạng yyyy-MM-dd",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "2026-10-31"
+                    },
+                    {
+                        "name": "channel",
+                        "in": "query",
+                        "description": "ONLINE hoặc OFFLINE; bỏ trống = tất cả",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "ONLINE",
+                                "OFFLINE"
+                            ]
+                        },
+                        "example": "ONLINE"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PromotionReportResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/reports/overview": {
+            "get": {
+                "tags": [
+                    "Report Management"
+                ],
+                "summary": "Tổng quan",
+                "description": "from/to (yyyy-MM-dd, giờ Việt Nam, gồm cả hai đầu); bỏ cả hai = hôm nay, tối đa 366 ngày. live: số đơn hiện tại theo trạng thái, đơn trễ, đồ tồn, đơn sắp đến hạn (không theo kỳ). period / previous: số đơn nhận, doanh thu, khách mới, sự cố của kỳ và kỳ liền trước cùng số ngày.",
+                "operationId": "getOverview",
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "description": "Ngày bắt đầu (yyyy-MM-dd)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "2026-11-10"
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "description": "Ngày kết thúc (yyyy-MM-dd)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "2026-11-16"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OverviewReportResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/reports/orders": {
             "get": {
                 "tags": [
@@ -4256,34 +4336,44 @@
                 }
             }
         },
-        "/api/reports/dashboard": {
+        "/api/reports/operations": {
             "get": {
                 "tags": [
                     "Report Management"
                 ],
-                "summary": "Dashboard theo kỳ",
-                "description": "from/to (yyyy-MM-dd, giờ Việt Nam, gồm cả hai đầu); bỏ cả hai = hôm nay, tối đa 366 ngày. orders.received / cancelled / delivered: đơn nhận (gồm đã hủy), số đã hủy trong đó, đơn giao trong kỳ; waiting / processing / readyForPickup là số đơn hiện đang ở Mới nhận / Đang xử lý / Hoàn thành chờ lấy (không theo kỳ). revenue: giao dịch đã xác nhận có thời điểm thanh toán trong kỳ, cùng cách tính với báo cáo doanh thu. alerts (không theo kỳ): lateOrders là đơn Mới nhận hoặc Đang xử lý đã quá ngày hẹn; storedOrders là đơn Hoàn thành quá storedAfterDays ngày (cấu hình OVERDUE_DAYS) mà khách chưa lấy. previous: số đơn nhận và tổng doanh thu của kỳ liền trước cùng số ngày.",
-                "operationId": "getDashboard",
+                "summary": "Báo cáo vận hành",
+                "description": "Số đơn theo nhân viên, tổng hợp và danh sách ca làm đã đóng, sự cố theo kỳ/loại/trạng thái và tiền chi sự cố trong khoảng ngày (giờ Việt Nam), kèm số sự cố của kỳ liền trước.",
+                "operationId": "getOperationsReport",
                 "parameters": [
                     {
                         "name": "from",
                         "in": "query",
-                        "description": "Ngày bắt đầu (yyyy-MM-dd)",
+                        "description": "Ngày bắt đầu, dạng yyyy-MM-dd",
                         "required": false,
                         "schema": {
                             "type": "string"
                         },
-                        "example": "2026-11-10"
+                        "example": "2026-10-01"
                     },
                     {
                         "name": "to",
                         "in": "query",
-                        "description": "Ngày kết thúc (yyyy-MM-dd)",
+                        "description": "Ngày kết thúc (gồm cả ngày này), dạng yyyy-MM-dd",
                         "required": false,
                         "schema": {
                             "type": "string"
                         },
-                        "example": "2026-11-16"
+                        "example": "2026-10-31"
+                    },
+                    {
+                        "name": "granularity",
+                        "in": "query",
+                        "description": "DAY hoặc MONTH, mặc định DAY",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "DAY"
                     }
                 ],
                 "responses": {
@@ -4292,7 +4382,98 @@
                         "content": {
                             "*/*": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/DashboardResponse"
+                                    "$ref": "#/components/schemas/OperationsReportResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/reports/customers": {
+            "get": {
+                "tags": [
+                    "Report Management"
+                ],
+                "summary": "Báo cáo khách hàng",
+                "description": "Khách mới, khách quay lại, tỉ lệ quay lại, số đăng ký và top 10 khách chi tiêu nhiều nhất trong khoảng ngày (giờ Việt Nam), kèm số khách mới của kỳ liền trước. Khoảng tối đa 366 ngày.",
+                "operationId": "getCustomerReport",
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "description": "Ngày bắt đầu, dạng yyyy-MM-dd",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "2026-10-01"
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "description": "Ngày kết thúc (gồm cả ngày này), dạng yyyy-MM-dd",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "2026-10-31"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CustomerReportResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/reports/customers/spending": {
+            "get": {
+                "tags": [
+                    "Report Management"
+                ],
+                "summary": "Chi tiêu của mọi khách (xuất CSV)",
+                "description": "Mọi khách có thanh toán trong khoảng ngày, không giới hạn 10 dòng như top khách; tối đa 50.000 dòng. Chỉ dùng khi xuất CSV.",
+                "operationId": "getCustomerSpending",
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "description": "Ngày bắt đầu, dạng yyyy-MM-dd",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "2026-10-01"
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "description": "Ngày kết thúc (gồm cả ngày này), dạng yyyy-MM-dd",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "2026-10-31"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/CustomerSpendingRow"
+                                    }
                                 }
                             }
                         }
@@ -7959,6 +8140,18 @@
                 "type": "object",
                 "description": "Request từ chối đơn online ở Chờ xác nhận",
                 "properties": {
+                    "reasonCode": {
+                        "type": "string",
+                        "description": "Lý do từ chối theo danh mục (6 giá trị dùng chung cancel/reject)",
+                        "enum": [
+                            "CUSTOMER_CHANGED_MIND",
+                            "CUSTOMER_UNREACHABLE",
+                            "WRONG_ORDER_INFO",
+                            "OUT_OF_SERVICE_AREA",
+                            "DUPLICATE_ORDER",
+                            "OTHER"
+                        ]
+                    },
                     "customerReason": {
                         "type": "string",
                         "description": "Lý do hiện cho khách",
@@ -7967,13 +8160,14 @@
                     },
                     "reason": {
                         "type": "string",
-                        "description": "Lý do nội bộ (tùy chọn)",
+                        "description": "Lý do nội bộ, tối đa 500 ký tự; bắt buộc khi reasonCode = OTHER",
                         "maxLength": 500,
                         "minLength": 0
                     }
                 },
                 "required": [
-                    "customerReason"
+                    "customerReason",
+                    "reasonCode"
                 ]
             },
             "RejectPaymentClaimRequest": {
@@ -8022,8 +8216,7 @@
                     },
                     "dueAt": {
                         "type": "string",
-                        "format": "date-time",
-                        "description": "Hạn trả chọn ở bước xác nhận; bỏ trống = minDue (FR-039)."
+                        "format": "date-time"
                     }
                 }
             },
@@ -8046,9 +8239,21 @@
                 "type": "object",
                 "description": "Request hủy đơn hàng (chỉ khi chưa nhận đồ)",
                 "properties": {
+                    "reasonCode": {
+                        "type": "string",
+                        "description": "Lý do hủy theo danh mục (6 giá trị dùng chung cancel/reject)",
+                        "enum": [
+                            "CUSTOMER_CHANGED_MIND",
+                            "CUSTOMER_UNREACHABLE",
+                            "WRONG_ORDER_INFO",
+                            "OUT_OF_SERVICE_AREA",
+                            "DUPLICATE_ORDER",
+                            "OTHER"
+                        ]
+                    },
                     "reason": {
                         "type": "string",
-                        "description": "Lý do nội bộ; bắt buộc với đơn tại quầy",
+                        "description": "Lý do nội bộ, tối đa 500 ký tự; bắt buộc khi reasonCode = OTHER",
                         "example": "Khách đổi ý",
                         "maxLength": 500,
                         "minLength": 0
@@ -8059,7 +8264,10 @@
                         "maxLength": 500,
                         "minLength": 0
                     }
-                }
+                },
+                "required": [
+                    "reasonCode"
+                ]
             },
             "IntakeRequest": {
                 "type": "object",
@@ -9389,20 +9597,6 @@
                     "pendingApproval": {
                         "type": "integer",
                         "format": "int64"
-                    },
-                    "differenceTotal": {
-                        "type": "number"
-                    },
-                    "shortCount": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "overCount": {
-                        "type": "integer",
-                        "format": "int64"
-                    },
-                    "handInTotal": {
-                        "type": "number"
                     }
                 }
             },
@@ -9718,6 +9912,10 @@
                     "summary": {
                         "$ref": "#/components/schemas/Summary",
                         "description": "Tổng cộng toàn khoảng"
+                    },
+                    "previous": {
+                        "$ref": "#/components/schemas/Previous",
+                        "description": "Kỳ liền trước cùng số ngày, để so sánh"
                     }
                 }
             },
@@ -9790,6 +9988,11 @@
                         "items": {
                             "$ref": "#/components/schemas/ChannelRevenue"
                         }
+                    },
+                    "paidOrders": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Số đơn có thanh toán được tính vào doanh thu kỳ"
                     }
                 }
             },
@@ -9831,6 +10034,244 @@
                     }
                 }
             },
+            "PromotionReportResponse": {
+                "type": "object",
+                "description": "Báo cáo khuyến mãi: lượt dùng, giảm giá và doanh thu theo mã voucher",
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "to": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "uses": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Tổng lượt dùng = Σ byVoucher.uses"
+                    },
+                    "discountTotal": {
+                        "type": "number",
+                        "description": "Tổng giảm giá = Σ byVoucher.discountTotal"
+                    },
+                    "revenue": {
+                        "type": "number",
+                        "description": "Tổng doanh thu = Σ byVoucher.revenue"
+                    },
+                    "byVoucher": {
+                        "type": "array",
+                        "description": "Theo mã voucher đã lưu trên đơn, sắp revenue rồi uses giảm dần",
+                        "items": {
+                            "$ref": "#/components/schemas/VoucherRow"
+                        }
+                    }
+                }
+            },
+            "VoucherRow": {
+                "type": "object",
+                "description": "Hiệu quả của một mã voucher",
+                "properties": {
+                    "voucherCode": {
+                        "type": "string"
+                    },
+                    "voucherId": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "MAX(orders.voucher_id), có thể null"
+                    },
+                    "uses": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "discountTotal": {
+                        "type": "number"
+                    },
+                    "revenue": {
+                        "type": "number"
+                    }
+                }
+            },
+            "Counts": {
+                "type": "object",
+                "description": "Bốn chỉ số so sánh theo kỳ",
+                "properties": {
+                    "receivedOrders": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "revenueTotal": {
+                        "type": "number"
+                    },
+                    "newCustomers": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "newIncidents": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                }
+            },
+            "DueSoon": {
+                "type": "object",
+                "properties": {
+                    "orderId": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "orderCode": {
+                        "type": "string"
+                    },
+                    "customerName": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "dueAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                }
+            },
+            "Live": {
+                "type": "object",
+                "description": "Số liệu hiện tại, không phụ thuộc kỳ",
+                "properties": {
+                    "waiting": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "processing": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "readyForPickup": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "pendingConfirmation": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "awaitingDropoff": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "lateOrders": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Đơn trễ hiện tại"
+                    },
+                    "storedOrders": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "storedAfterDays": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "dueSoon": {
+                        "type": "array",
+                        "description": "Đơn sắp đến hạn trong 24 giờ, tối đa 10",
+                        "items": {
+                            "$ref": "#/components/schemas/DueSoon"
+                        }
+                    },
+                    "stored": {
+                        "type": "array",
+                        "description": "Đồ tồn, chờ lâu nhất trước, tối đa 10",
+                        "items": {
+                            "$ref": "#/components/schemas/Stored"
+                        }
+                    }
+                }
+            },
+            "OverviewReportResponse": {
+                "type": "object",
+                "description": "Tổng quan: số liệu hiện tại và số liệu kỳ so với kỳ liền trước",
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "to": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "live": {
+                        "$ref": "#/components/schemas/Live"
+                    },
+                    "period": {
+                        "$ref": "#/components/schemas/Counts"
+                    },
+                    "previous": {
+                        "$ref": "#/components/schemas/Counts"
+                    }
+                }
+            },
+            "Stored": {
+                "type": "object",
+                "properties": {
+                    "orderId": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "orderCode": {
+                        "type": "string"
+                    },
+                    "customerName": {
+                        "type": "string"
+                    },
+                    "readyAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "daysWaiting": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                }
+            },
+            "CancelReasonCount": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "count": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                }
+            },
+            "Online": {
+                "type": "object",
+                "properties": {
+                    "requests": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "confirmed": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "cancelled": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "confirmRatePercent": {
+                        "type": "number"
+                    },
+                    "avgConfirmMinutes": {
+                        "type": "number"
+                    }
+                }
+            },
             "OrderReportResponse": {
                 "type": "object",
                 "description": "Báo cáo đơn hàng và doanh thu theo dịch vụ , tính trên các đơn nhận trong khoảng ngày",
@@ -9858,6 +10299,30 @@
                     },
                     "summary": {
                         "$ref": "#/components/schemas/Summary"
+                    },
+                    "previous": {
+                        "$ref": "#/components/schemas/Previous"
+                    },
+                    "cancelReasons": {
+                        "type": "array",
+                        "description": "Lý do hủy, luôn đủ mọi mã, sắp theo count giảm dần rồi thứ tự danh mục",
+                        "items": {
+                            "$ref": "#/components/schemas/CancelReasonCount"
+                        }
+                    },
+                    "processing": {
+                        "$ref": "#/components/schemas/Processing"
+                    },
+                    "byWashMode": {
+                        "type": "array",
+                        "description": "Đơn nhận theo hình thức giặt, sắp theo amount giảm dần",
+                        "items": {
+                            "$ref": "#/components/schemas/WashModeTotals"
+                        }
+                    },
+                    "online": {
+                        "$ref": "#/components/schemas/Online",
+                        "description": "Phễu đơn online; null khi lọc kênh OFFLINE"
                     },
                     "byStatus": {
                         "type": "array",
@@ -9894,6 +10359,29 @@
                     "received": {
                         "type": "integer",
                         "format": "int64"
+                    }
+                }
+            },
+            "Processing": {
+                "type": "object",
+                "description": "Thời gian xử lý; các giá trị null khi không có mẫu",
+                "properties": {
+                    "completedOrders": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "avgHours": {
+                        "type": "number"
+                    },
+                    "medianHours": {
+                        "type": "number"
+                    },
+                    "onTimeOrders": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "onTimeRatePercent": {
+                        "type": "number"
                     }
                 }
             },
@@ -9949,102 +10437,266 @@
                     }
                 }
             },
-            "Alerts": {
+            "WashModeTotals": {
                 "type": "object",
-                "description": "Cảnh báo cần xử lý",
                 "properties": {
-                    "lateOrders": {
+                    "washModeId": {
                         "type": "integer",
-                        "format": "int64",
-                        "description": "Đơn đang trễ: trạng thái Mới nhận hoặc Đang xử lý mà đã quá ngày hẹn trả"
+                        "format": "int64"
                     },
-                    "storedOrders": {
-                        "type": "integer",
-                        "format": "int64",
-                        "description": "Đồ tồn: đơn Hoàn thành quá storedAfterDays ngày mà khách chưa đến lấy"
+                    "washModeName": {
+                        "type": "string"
                     },
-                    "storedAfterDays": {
+                    "orders": {
                         "type": "integer",
-                        "format": "int32",
-                        "description": "Số ngày dùng để xác định đồ tồn (cấu hình OVERDUE_DAYS)",
-                        "example": 7
+                        "format": "int64"
+                    },
+                    "amount": {
+                        "type": "number"
                     }
                 }
             },
-            "DashboardResponse": {
+            "Incidents": {
                 "type": "object",
-                "description": "Dashboard theo kỳ (giờ Việt Nam): số đơn, doanh thu, đơn trễ, đồ tồn, so với kỳ liền trước",
+                "description": "Sự cố tạo trong kỳ",
+                "properties": {
+                    "total": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "rows": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PeriodCount"
+                        }
+                    },
+                    "byType": {
+                        "type": "array",
+                        "description": "Sắp count giảm dần",
+                        "items": {
+                            "$ref": "#/components/schemas/TypeCount"
+                        }
+                    },
+                    "byStatus": {
+                        "type": "array",
+                        "description": "Sắp count giảm dần",
+                        "items": {
+                            "$ref": "#/components/schemas/StatusCount"
+                        }
+                    },
+                    "payouts": {
+                        "$ref": "#/components/schemas/Payouts"
+                    }
+                }
+            },
+            "OperationsReportResponse": {
+                "type": "object",
+                "description": "Báo cáo vận hành: đơn theo nhân viên, ca làm, sự cố",
                 "properties": {
                     "from": {
                         "type": "string",
-                        "format": "date",
-                        "description": "Ngày đầu kỳ",
-                        "example": "2026-11-10"
+                        "format": "date"
                     },
                     "to": {
                         "type": "string",
-                        "format": "date",
-                        "description": "Ngày cuối kỳ (gồm cả ngày này)",
-                        "example": "2026-11-16"
+                        "format": "date"
                     },
-                    "orders": {
-                        "$ref": "#/components/schemas/Orders"
+                    "granularity": {
+                        "type": "string",
+                        "enum": [
+                            "DAY",
+                            "MONTH"
+                        ]
                     },
-                    "revenue": {
-                        "$ref": "#/components/schemas/Summary",
-                        "description": "Doanh thu trong kỳ, cùng cách tính với báo cáo doanh thu (BM11)"
+                    "byStaff": {
+                        "type": "array",
+                        "description": "Đơn theo nhân viên, sắp orders giảm dần",
+                        "items": {
+                            "$ref": "#/components/schemas/StaffOrders"
+                        }
                     },
-                    "alerts": {
-                        "$ref": "#/components/schemas/Alerts"
+                    "shifts": {
+                        "$ref": "#/components/schemas/Shifts"
+                    },
+                    "shiftRows": {
+                        "type": "array",
+                        "description": "Các ca đã đếm trong shifts, sắp closedAt tăng dần",
+                        "items": {
+                            "$ref": "#/components/schemas/ShiftRow"
+                        }
+                    },
+                    "incidents": {
+                        "$ref": "#/components/schemas/Incidents"
                     },
                     "previous": {
                         "$ref": "#/components/schemas/Previous"
                     }
                 }
             },
-            "Orders": {
+            "Payouts": {
                 "type": "object",
-                "description": "Số đơn",
+                "description": "Tiền chi sự cố theo paid_at trong kỳ",
                 "properties": {
-                    "received": {
-                        "type": "integer",
-                        "format": "int64",
-                        "description": "Đơn nhận trong kỳ, gồm cả đơn đã hủy"
+                    "cash": {
+                        "type": "number"
                     },
-                    "cancelled": {
+                    "bankTransfer": {
+                        "type": "number"
+                    }
+                }
+            },
+            "ShiftRow": {
+                "type": "object",
+                "properties": {
+                    "shiftId": {
                         "type": "integer",
-                        "format": "int64",
-                        "description": "Trong số đơn nhận trong kỳ, số đã hủy"
+                        "format": "int64"
                     },
-                    "delivered": {
-                        "type": "integer",
-                        "format": "int64",
-                        "description": "Đơn giao cho khách trong kỳ"
+                    "code": {
+                        "type": "string"
                     },
-                    "waiting": {
-                        "type": "integer",
-                        "format": "int64",
-                        "description": "Số đơn hiện đang ở trạng thái Mới nhận (chưa xử lý), không giới hạn trong ngày"
+                    "openedByName": {
+                        "type": "string"
                     },
-                    "processing": {
-                        "type": "integer",
-                        "format": "int64",
-                        "description": "Số đơn hiện đang ở trạng thái Đang xử lý, không giới hạn trong ngày"
+                    "closedAt": {
+                        "type": "string",
+                        "format": "date-time"
                     },
-                    "readyForPickup": {
-                        "type": "integer",
-                        "format": "int64",
-                        "description": "Số đơn hiện đang ở trạng thái Hoàn thành, chờ khách đến lấy, không giới hạn trong ngày"
+                    "status": {
+                        "type": "string"
                     },
-                    "pendingConfirmation": {
-                        "type": "integer",
-                        "format": "int64",
-                        "description": "Số đơn online hiện ở Chờ xác nhận"
+                    "difference": {
+                        "type": "number"
                     },
-                    "awaitingDropoff": {
+                    "handInCash": {
+                        "type": "number"
+                    }
+                }
+            },
+            "Shifts": {
+                "type": "object",
+                "description": "Tổng hợp ca có closed_at trong kỳ",
+                "properties": {
+                    "closed": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "short": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "over": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "differenceTotal": {
+                        "type": "number"
+                    },
+                    "handInTotal": {
+                        "type": "number"
+                    }
+                }
+            },
+            "StaffOrders": {
+                "type": "object",
+                "description": "Đơn của một nhân viên",
+                "properties": {
+                    "username": {
+                        "type": "string"
+                    },
+                    "fullName": {
+                        "type": "string",
+                        "description": "null khi username không còn trong users"
+                    },
+                    "orders": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                }
+            },
+            "TypeCount": {
+                "type": "object",
+                "properties": {
+                    "type": {
+                        "type": "string"
+                    },
+                    "count": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                }
+            },
+            "CustomerReportResponse": {
+                "type": "object",
+                "description": "Báo cáo khách hàng: khách mới, khách quay lại, top khách chi tiêu",
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "to": {
+                        "type": "string",
+                        "format": "date"
+                    },
+                    "newCustomers": {
                         "type": "integer",
                         "format": "int64",
-                        "description": "Số đơn online hiện ở Chờ nhận đồ"
+                        "description": "Khách có đơn nhận trong kỳ mà chưa có đơn nào trước kỳ"
+                    },
+                    "returningCustomers": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Khách có đơn nhận trong kỳ và đã có đơn trước kỳ"
+                    },
+                    "returnRatePercent": {
+                        "type": "number",
+                        "description": "Tỉ lệ quay lại (%) = returning / (new + returning), 1 chữ số thập phân; null khi mẫu 0",
+                        "example": 62.5
+                    },
+                    "registrations": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Số đăng ký khách trong kỳ, mọi trạng thái"
+                    },
+                    "previous": {
+                        "$ref": "#/components/schemas/Previous"
+                    },
+                    "topCustomers": {
+                        "type": "array",
+                        "description": "Top khách, tối đa 10 dòng, sắp theo spent giảm dần rồi mã khách",
+                        "items": {
+                            "$ref": "#/components/schemas/CustomerSpendingRow"
+                        }
+                    }
+                }
+            },
+            "CustomerSpendingRow": {
+                "type": "object",
+                "description": "Chi tiêu của một khách trong kỳ",
+                "properties": {
+                    "customerId": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "customerCode": {
+                        "type": "string"
+                    },
+                    "customerName": {
+                        "type": "string"
+                    },
+                    "orderCount": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Số đơn nhận trong kỳ"
+                    },
+                    "spent": {
+                        "type": "number",
+                        "description": "Tổng tiền đã thu (CONFIRMED) trong kỳ"
+                    },
+                    "lastOrderAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Thời điểm nhận đơn gần nhất"
                     }
                 }
             },
@@ -11120,12 +11772,6 @@
                     "all": {
                         "type": "integer",
                         "format": "int64"
-                    },
-                    "paidCash": {
-                        "type": "number"
-                    },
-                    "paidTransfer": {
-                        "type": "number"
                     }
                 }
             },

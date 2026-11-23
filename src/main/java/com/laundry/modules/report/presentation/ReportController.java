@@ -2,8 +2,11 @@ package com.laundry.modules.report.presentation;
 
 import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.report.application.ReportService;
-import com.laundry.modules.report.application.dto.DashboardResponse;
+import com.laundry.modules.report.application.dto.CustomerReportResponse;
+import com.laundry.modules.report.application.dto.OperationsReportResponse;
 import com.laundry.modules.report.application.dto.OrderReportResponse;
+import com.laundry.modules.report.application.dto.OverviewReportResponse;
+import com.laundry.modules.report.application.dto.PromotionReportResponse;
 import com.laundry.modules.report.application.dto.RevenuePaymentResponse;
 import com.laundry.modules.report.application.dto.RevenueReportResponse;
 import com.laundry.modules.report.domain.ReportPeriod;
@@ -74,23 +77,19 @@ public class ReportController {
     }
 
     @Operation(
-            summary = "Dashboard theo kỳ",
+            summary = "Tổng quan",
             description = "from/to (yyyy-MM-dd, giờ Việt Nam, gồm cả hai đầu); bỏ cả hai = hôm nay, tối đa 366 ngày. "
-                    + "orders.received / cancelled / delivered: đơn nhận (gồm đã hủy), số đã hủy trong đó, đơn giao trong kỳ; "
-                    + "waiting / processing / readyForPickup là số đơn hiện đang ở Mới nhận / Đang xử lý / Hoàn thành chờ lấy "
-                    + "(không theo kỳ). revenue: giao dịch đã xác nhận có thời điểm thanh toán trong kỳ, cùng cách tính với "
-                    + "báo cáo doanh thu. alerts (không theo kỳ): lateOrders là đơn Mới nhận hoặc Đang xử lý đã quá ngày hẹn; "
-                    + "storedOrders là đơn Hoàn thành quá storedAfterDays ngày (cấu hình OVERDUE_DAYS) mà khách chưa lấy. "
-                    + "previous: số đơn nhận và tổng doanh thu của kỳ liền trước cùng số ngày."
+                    + "live: số đơn hiện tại theo trạng thái, đơn trễ, đồ tồn, đơn sắp đến hạn (không theo kỳ). "
+                    + "period / previous: số đơn nhận, doanh thu, khách mới, sự cố của kỳ và kỳ liền trước cùng số ngày."
     )
-    @GetMapping("/dashboard")
+    @GetMapping("/overview")
     @ResponseStatus(HttpStatus.OK)
-    public DashboardResponse getDashboard(
+    public OverviewReportResponse getOverview(
             @Parameter(description = "Ngày bắt đầu (yyyy-MM-dd)", example = "2026-11-10")
             @RequestParam(required = false) String from,
             @Parameter(description = "Ngày kết thúc (yyyy-MM-dd)", example = "2026-11-16")
             @RequestParam(required = false) String to) {
-        return reportService.getDashboard(ReportPeriod.ofOptional(from, to));
+        return reportService.getOverview(from, to);
     }
 
     @Operation(
@@ -113,5 +112,69 @@ public class ReportController {
             @Parameter(description = "ONLINE hoặc OFFLINE; bỏ trống = tất cả", example = "ONLINE")
             @RequestParam(required = false) OrderChannel channel) {
         return reportService.getOrderReport(from, to, granularity, channel);
+    }
+
+    @Operation(
+            summary = "Báo cáo vận hành",
+            description = "Số đơn theo nhân viên, tổng hợp và danh sách ca làm đã đóng, sự cố theo kỳ/loại/trạng thái "
+                    + "và tiền chi sự cố trong khoảng ngày (giờ Việt Nam), kèm số sự cố của kỳ liền trước."
+    )
+    @GetMapping("/operations")
+    @ResponseStatus(HttpStatus.OK)
+    public OperationsReportResponse getOperationsReport(
+            @Parameter(description = "Ngày bắt đầu, dạng yyyy-MM-dd", example = "2026-10-01")
+            @RequestParam(required = false) String from,
+            @Parameter(description = "Ngày kết thúc (gồm cả ngày này), dạng yyyy-MM-dd", example = "2026-10-31")
+            @RequestParam(required = false) String to,
+            @Parameter(description = "DAY hoặc MONTH, mặc định DAY", example = "DAY")
+            @RequestParam(required = false) String granularity) {
+        return reportService.getOperationsReport(from, to, granularity);
+    }
+
+    @Operation(
+            summary = "Báo cáo khách hàng",
+            description = "Khách mới, khách quay lại, tỉ lệ quay lại, số đăng ký và top 10 khách chi tiêu nhiều nhất "
+                    + "trong khoảng ngày (giờ Việt Nam), kèm số khách mới của kỳ liền trước. Khoảng tối đa 366 ngày."
+    )
+    @GetMapping("/customers")
+    @ResponseStatus(HttpStatus.OK)
+    public CustomerReportResponse getCustomerReport(
+            @Parameter(description = "Ngày bắt đầu, dạng yyyy-MM-dd", example = "2026-10-01")
+            @RequestParam(required = false) String from,
+            @Parameter(description = "Ngày kết thúc (gồm cả ngày này), dạng yyyy-MM-dd", example = "2026-10-31")
+            @RequestParam(required = false) String to) {
+        return reportService.getCustomerReport(from, to);
+    }
+
+    @Operation(
+            summary = "Chi tiêu của mọi khách (xuất CSV)",
+            description = "Mọi khách có thanh toán trong khoảng ngày, không giới hạn 10 dòng như top khách; "
+                    + "tối đa 50.000 dòng. Chỉ dùng khi xuất CSV."
+    )
+    @GetMapping("/customers/spending")
+    @ResponseStatus(HttpStatus.OK)
+    public List<CustomerReportResponse.CustomerSpendingRow> getCustomerSpending(
+            @Parameter(description = "Ngày bắt đầu, dạng yyyy-MM-dd", example = "2026-10-01")
+            @RequestParam(required = false) String from,
+            @Parameter(description = "Ngày kết thúc (gồm cả ngày này), dạng yyyy-MM-dd", example = "2026-10-31")
+            @RequestParam(required = false) String to) {
+        return reportService.getCustomerSpending(from, to);
+    }
+
+    @Operation(
+            summary = "Báo cáo khuyến mãi",
+            description = "Lượt dùng, tổng giảm giá và doanh thu theo mã voucher đã lưu trên đơn, trong khoảng ngày "
+                    + "(giờ Việt Nam). Sắp theo doanh thu giảm dần, rồi lượt dùng. Khoảng tối đa 366 ngày."
+    )
+    @GetMapping("/promotions")
+    @ResponseStatus(HttpStatus.OK)
+    public PromotionReportResponse getPromotionReport(
+            @Parameter(description = "Ngày bắt đầu, dạng yyyy-MM-dd", example = "2026-10-01")
+            @RequestParam(required = false) String from,
+            @Parameter(description = "Ngày kết thúc (gồm cả ngày này), dạng yyyy-MM-dd", example = "2026-10-31")
+            @RequestParam(required = false) String to,
+            @Parameter(description = "ONLINE hoặc OFFLINE; bỏ trống = tất cả", example = "ONLINE")
+            @RequestParam(required = false) OrderChannel channel) {
+        return reportService.getPromotionReport(from, to, channel);
     }
 }

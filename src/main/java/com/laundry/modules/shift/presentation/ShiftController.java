@@ -61,8 +61,8 @@ public class ShiftController {
 
     @GetMapping("/summary")
     @PreAuthorize("hasRole('ADMIN')")
-    public ShiftSummaryResponse summary(@RequestParam String from, @RequestParam String to) {
-        return shiftService.summary(from, to);
+    public ShiftSummaryResponse summary() {
+        return shiftService.summary();
     }
 
     @PostMapping("/{id}/approve")

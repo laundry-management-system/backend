@@ -22,7 +22,10 @@ public record RevenueReportResponse(
         List<Row> rows,
 
         @Schema(description = "Tổng cộng toàn khoảng")
-        Summary summary
+        Summary summary,
+
+        @Schema(description = "Kỳ liền trước cùng số ngày, để so sánh")
+        Previous previous
 ) {
 
     @Schema(description = "Doanh thu của một kỳ")
@@ -63,8 +66,14 @@ public record RevenueReportResponse(
             long bankTransferCount,
 
             @Schema(description = "Tiền thực thu theo kênh của đơn, luôn đủ ONLINE và OFFLINE, bỏ qua bộ lọc kênh")
-            List<ChannelRevenue> byChannel
+            List<ChannelRevenue> byChannel,
+
+            @Schema(description = "Số đơn có thanh toán được tính vào doanh thu kỳ")
+            long paidOrders
     ) {}
+
+    @Schema(description = "Doanh thu kỳ liền trước")
+    public record Previous(LocalDate from, LocalDate to, BigDecimal total, long paidOrders) {}
 
     @Schema(description = "Doanh thu của một kênh")
     public record ChannelRevenue(OrderChannel channel, BigDecimal total, long paymentCount) {}
