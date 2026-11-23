@@ -4,9 +4,7 @@ import com.laundry.modules.order.domain.Order;
 import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.order.domain.OrderPriority;
 import com.laundry.modules.order.domain.OrderStatus;
-import com.laundry.modules.order.domain.OrderType;
 import com.laundry.modules.order.domain.PaymentStatus;
-import com.laundry.modules.order.domain.ServiceType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -19,8 +17,6 @@ public record OrderDetailResponse(
         Long customerId,
         String customerName,
         String customerPhone,
-        ServiceType serviceType,
-        String serviceName,
         BigDecimal totalWeight,
         BigDecimal unitPrice,
         BigDecimal subtotal,
@@ -31,7 +27,9 @@ public record OrderDetailResponse(
         BigDecimal payableAmount,
         String note,
         OrderPriority priority,
-        OrderType orderType,
+        Long washModeId,
+        String washModeName,
+        @Schema(description = "Giờ hoàn thành đã chụp trên đơn (chỉ đọc)") Integer washModeHours,
         OrderStatus status,
         String statusDescription,
         PaymentStatus paymentStatus,
@@ -68,7 +66,8 @@ public record OrderDetailResponse(
 ) {
     public static OrderDetailResponse from(Order order) {
         List<RequestedServiceDto> requested = order.getRequestedServiceIds() == null ? List.of()
-                : order.getRequestedServiceIds().stream().map(id -> new RequestedServiceDto(id, null, null)).toList();
+                : order.getRequestedServiceIds().stream().map(id -> new RequestedServiceDto(id, null, null,
+                        order.getRequestedServicePrices() != null ? order.getRequestedServicePrices().get(id) : null)).toList();
         return from(order, requested, List.of(), order.getCompensationMultiplier(), order.getCompensationCap());
     }
 
@@ -90,8 +89,6 @@ public record OrderDetailResponse(
                 order.getCustomerId(),
                 order.getCustomerName(),
                 order.getCustomerPhone(),
-                order.getServiceType(),
-                order.getServiceType() != null ? order.getServiceType().getDisplayName() : null,
                 order.getTotalWeight(),
                 order.getUnitPrice(),
                 order.getSubtotal(),
@@ -102,7 +99,9 @@ public record OrderDetailResponse(
                 order.payableAmount(),
                 order.getNote(),
                 order.getPriority(),
-                order.getOrderType(),
+                order.getWashModeId(),
+                order.getWashModeName(),
+                order.getWashModeHours(),
                 order.getStatus(),
                 order.getStatus().getDescription(),
                 order.getPaymentStatus(),

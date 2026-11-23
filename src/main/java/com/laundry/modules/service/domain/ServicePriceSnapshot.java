@@ -4,48 +4,41 @@ import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.SortedMap;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
-/** Giá trị các trường theo dõi của dịch vụ tại một thời điểm, để biết lần lưu nào cần ghi lịch sử giá. */
-public record ServicePriceSnapshot(
-        BigDecimal currentPrice,
-        BigDecimal expressSurcharge,
-        Integer standardHours,
-        Integer expressHours,
-        ServiceStatus status
-) {
+/** Giá theo hình thức (washModeId -> giá) và trạng thái của dịch vụ tại một thời điểm, để biết lần lưu nào cần ghi lịch sử giá. */
+public record ServicePriceSnapshot(SortedMap<Long, BigDecimal> modePrices, ServiceStatus status) {
 
     public record Diff(Map<String, Object> oldData, Map<String, Object> newData) {
         public boolean isEmpty() { return newData.isEmpty(); }
     }
 
     public static ServicePriceSnapshot of(LaundryService s) {
-        return new ServicePriceSnapshot(
-                s.getCurrentPrice(), s.getExpressSurcharge(), s.getStandardHours(), s.getExpressHours(), s.getStatus());
+        SortedMap<Long, BigDecimal> prices = new TreeMap<>();
+        s.getPrices().forEach(p -> prices.put(p.getWashMode().getId(), compact(p.getPrice())));
+        return new ServicePriceSnapshot(prices, s.getStatus());
     }
 
-    /** Chỉ gồm các key khác nhau, theo thứ tự {@link PriceField}. */
+    /** Chỉ gồm các key khác nhau: {@code modePrice:<id>} theo id (thêm liên kết: cũ null, bỏ liên kết: mới null), rồi status. */
     public Diff diff(ServicePriceSnapshot after) {
         Map<String, Object> oldData = new LinkedHashMap<>();
         Map<String, Object> newData = new LinkedHashMap<>();
-        for (PriceField field : PriceField.values()) {
-            Object before = value(field);
-            Object now = after.value(field);
-            if (!same(before, now)) {
-                oldData.put(field.key(), before);
-                newData.put(field.key(), now);
-            }
+        TreeSet<Long> modeIds = new TreeSet<>(modePrices.keySet());
+        modeIds.addAll(after.modePrices.keySet());
+        for (Long id : modeIds) {
+            put(oldData, newData, PriceField.modePriceKey(id), modePrices.get(id), after.modePrices.get(id));
         }
+        put(oldData, newData, PriceField.STATUS.key(),
+                status != null ? status.name() : null, after.status != null ? after.status.name() : null);
         return new Diff(oldData, newData);
     }
 
-    private Object value(PriceField field) {
-        return switch (field) {
-            case PRICE -> compact(currentPrice);
-            case EXPRESS_SURCHARGE -> compact(expressSurcharge);
-            case STANDARD_HOURS -> standardHours;
-            case EXPRESS_HOURS -> expressHours;
-            case STATUS -> status != null ? status.name() : null;
-        };
+    private static void put(Map<String, Object> oldData, Map<String, Object> newData, String key, Object before, Object now) {
+        if (same(before, now)) return;
+        oldData.put(key, before);
+        newData.put(key, now);
     }
 
     // 25000 và 25000.00 là cùng giá; lưu dạng gọn để JSON ra 25000 chứ không phải 2.5E+4

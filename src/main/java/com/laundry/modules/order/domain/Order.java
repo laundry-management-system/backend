@@ -16,8 +16,12 @@ import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
@@ -48,6 +52,10 @@ import org.hibernate.type.SqlTypes;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 public class Order extends BaseEntity {
+
+    /** Định dạng hạn trả trong thông báo lỗi (giờ VN). */
+    public static final DateTimeFormatter DUE_FORMAT =
+            DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy").withZone(ZoneId.of("Asia/Ho_Chi_Minh"));
 
     @Column(name = "order_code", nullable = false, unique = true, length = 15)
     private String orderCode;
@@ -109,14 +117,29 @@ public class Order extends BaseEntity {
     @Column(name = "due_at", nullable = false)
     private Instant dueAt;
 
+    // Dữ liệu cũ; đơn theo hình thức giặt để null nên expressFee = 0
     @Enumerated(EnumType.STRING)
-    @Column(name = "order_type", nullable = false, length = 20)
-    @Builder.Default
-    private OrderType orderType = OrderType.NORMAL;
+    @Column(name = "order_type", length = 20)
+    private OrderType orderType;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "service_type", length = 30)
-    private ServiceType serviceType;
+    @Column(name = "wash_mode_id")
+    private Long washModeId;
+
+    @Column(name = "wash_mode_name", length = 50)
+    private String washModeName;
+
+    @Column(name = "wash_mode_hours")
+    private Integer washModeHours;
+
+    // serviceId -> đơn giá danh mục chụp lúc tạo đơn
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "requested_service_prices", columnDefinition = "jsonb")
+    private Map<Long, BigDecimal> requestedServicePrices;
+
+    // serviceId -> express_surcharge của đơn EXPRESS cũ chưa phân loại; chỉ script ghi
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "legacy_service_surcharges", columnDefinition = "jsonb")
+    private Map<Long, BigDecimal> legacyServiceSurcharges;
 
     @Column(name = "total_weight", precision = 6, scale = 2)
     private BigDecimal totalWeight;
@@ -608,22 +631,56 @@ public class Order extends BaseEntity {
         }
     }
 
-    /** Đồ về tiệm: mở khóa xử lý. Không đổi dueAt (giữ giờ hẹn nhận khách đã chọn). */
-    public void completeDropoff(String pickupTrackingCode, String performedBy) {
+    /**
+     * Đồ về tiệm (khách tự mang tới hoặc tiệm đi lấy): mở khóa xử lý và chốt dueAt theo
+     * {@link #resolveDropoffDue} (FR-014, FR-039); requestedDueAt null = giữ hạn gợi ý.
+     */
+    public void completeDropoff(String pickupTrackingCode, Instant now, Instant requestedDueAt, LocalTime open,
+                                LocalTime close, String performedBy) {
         if (this.status != OrderStatus.AWAITING_DROPOFF || this.fulfillment == null) {
             throw new BusinessException("Đơn đã được xử lý, vui lòng tải lại");
         }
+        boolean pickup = this.fulfillment.getDropoffMethod() == DropoffMethod.PICKUP;
+        resolveDropoffDue(now, requestedDueAt, open, close, performedBy);
         changePickupCode(pickupTrackingCode, performedBy);
         DropoffStatus oldDropoff = this.fulfillment.getDropoffStatus();
-        DropoffStatus newDropoff = this.fulfillment.getDropoffMethod() == DropoffMethod.PICKUP
-                ? DropoffStatus.PICKED_UP : DropoffStatus.CUSTOMER_DROPPED_OFF;
+        DropoffStatus newDropoff = pickup ? DropoffStatus.PICKED_UP : DropoffStatus.CUSTOMER_DROPPED_OFF;
         this.fulfillment.setDropoffStatus(newDropoff);
-        this.receivedAt = Instant.now();
+        this.receivedAt = now;
         this.status = OrderStatus.RECEIVED;
         addHistory(HistoryActionType.DROPOFF_STATUS_CHANGE, oldDropoff == null ? null : oldDropoff.name(),
                 newDropoff.name(), null, performedBy);
         addHistory(HistoryActionType.STATUS_CHANGE, OrderStatus.AWAITING_DROPOFF.name(), OrderStatus.RECEIVED.name(),
                 null, performedBy);
+    }
+
+    /**
+     * Chỉ đổi được khi trễ giờ hẹn và dueAt hiện tại sớm hơn minDue = dueAtFor(now, washModeHours): requested null
+     * → minDue; sớm hơn minDue → lỗi field dueAt; khác dueAt cũ → ghi RESCHEDULE. Mọi ca khác (đúng hẹn, trễ mà vẫn
+     * kịp) giữ dueAt; requested khác dueAt → lỗi field dueAt (FR-039).
+     */
+    private void resolveDropoffDue(Instant now, Instant requestedDueAt, LocalTime open, LocalTime close,
+                                   String performedBy) {
+        Instant appt = this.fulfillment.getAppointmentAt();
+        Instant minDue = appt != null && now.isAfter(appt) && this.washModeHours != null && this.dueAt != null
+                ? AppointmentRules.dueAtFor(now, this.washModeHours, open, close) : null;
+        if (minDue == null || !minDue.isAfter(this.dueAt)) {
+            if (requestedDueAt != null && !requestedDueAt.equals(this.dueAt)) {
+                throw new BusinessException("Hạn trả hiện tại vẫn kịp nên không đổi được", "dueAt");
+            }
+            return;
+        }
+        Instant newDue = requestedDueAt != null ? requestedDueAt : minDue;
+        if (newDue.isBefore(minDue)) {
+            throw new BusinessException("Hạn trả phải từ " + DUE_FORMAT.format(minDue) + " trở đi", "dueAt");
+        }
+        boolean lateDefault = newDue.equals(minDue);
+        String note = !lateDefault ? "Đổi hạn trả khi nhận đồ"
+                : this.fulfillment.getDropoffMethod() == DropoffMethod.PICKUP
+                        ? "Tiệm tới nhận trễ giờ hẹn" : "Khách tới trễ giờ hẹn";
+        addHistory(HistoryActionType.RESCHEDULE, String.valueOf(this.dueAt), String.valueOf(newDue), note,
+                performedBy);
+        this.dueAt = newDue;
     }
 
     public void startDelivery(String deliveryTrackingCode, String performedBy) {

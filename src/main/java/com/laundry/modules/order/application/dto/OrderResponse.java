@@ -6,10 +6,8 @@ import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.order.domain.OrderFulfillment;
 import com.laundry.modules.order.domain.OrderPriority;
 import com.laundry.modules.order.domain.OrderStatus;
-import com.laundry.modules.order.domain.OrderType;
 import com.laundry.modules.order.domain.PaymentStatus;
 import com.laundry.modules.order.domain.ReturnStatus;
-import com.laundry.modules.order.domain.ServiceType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -20,13 +18,12 @@ public record OrderResponse(
         String orderCode,
         String customerName,
         String customerPhone,
-        ServiceType serviceType,
-        String serviceName,
         BigDecimal totalWeight,
         BigDecimal totalAmount,
         BigDecimal payableAmount,
         OrderPriority priority,
-        OrderType orderType,
+        Long washModeId,
+        String washModeName,
         OrderStatus status,
         String statusDescription,
         PaymentStatus paymentStatus,
@@ -59,13 +56,12 @@ public record OrderResponse(
                 order.getOrderCode(),
                 order.getCustomerName(),
                 order.getCustomerPhone(),
-                order.getServiceType(),
-                order.getServiceType() != null ? order.getServiceType().getDisplayName() : null,
                 order.getTotalWeight(),
                 order.getTotalAmount(),
                 order.payableAmount(),
                 order.getPriority(),
-                order.getOrderType(),
+                order.getWashModeId(),
+                order.getWashModeName(),
                 order.getStatus(),
                 order.getStatus().getDescription(),
                 order.getPaymentStatus(),

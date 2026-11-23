@@ -19,12 +19,14 @@ import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.order.domain.OrderFulfillment;
 import com.laundry.modules.order.domain.OrderRepository;
 import com.laundry.modules.order.domain.OrderStatus;
-import com.laundry.modules.order.domain.OrderType;
 import com.laundry.modules.order.domain.PaymentStatus;
 import com.laundry.modules.order.domain.ReturnMethod;
+import com.laundry.modules.service.application.WashModeService;
 import com.laundry.modules.service.domain.LaundryService;
 import com.laundry.modules.service.domain.LaundryServiceRepository;
 import com.laundry.modules.service.domain.ServiceStatus;
+import com.laundry.modules.service.domain.WashMode;
+import com.laundry.modules.service.domain.WashModeRepository;
 import com.laundry.modules.setting.application.SettingService;
 import com.laundry.modules.setting.domain.ServiceArea;
 import com.laundry.modules.setting.domain.ServiceAreaRepository;
@@ -61,6 +63,8 @@ public class OnlineBookingService {
     private final CodeSequenceService codeSequenceService;
     private final AuditLogService auditLogService;
     private final ServiceAreaRepository serviceAreaRepository;
+    private final WashModeService washModeService;
+    private final WashModeRepository washModeRepository;
 
     /** Gửi lại cùng requestId trả về đơn đã có (created=false), không ghi đè. */
     @Transactional
@@ -87,7 +91,6 @@ public class OnlineBookingService {
         Instant now = Instant.now();
         Map<String, String> errors = new LinkedHashMap<>();
 
-        boolean express = req.orderType() == OrderType.EXPRESS;
         List<LaundryService> services = new ArrayList<>();
         Set<Long> seen = new HashSet<>();
         for (int i = 0; i < req.items().size(); i++) {
@@ -107,11 +110,18 @@ public class OnlineBookingService {
                 errors.put(key + ".serviceId", "Dịch vụ " + svc.getName() + " hiện không nhận đặt");
                 continue;
             }
-            if (express && !Boolean.TRUE.equals(svc.getExpressSupported())) {
-                errors.put(key + ".serviceId", "Dịch vụ " + svc.getName() + " không hỗ trợ giặt nhanh");
-                continue;
-            }
             services.add(svc);
+        }
+        // Hình thức luôn được kiểm; giá từng dịch vụ chỉ khi các dòng đều hợp lệ (chỉ số items[i] khớp)
+        List<Long> serviceIds = services.stream().map(LaundryService::getId).toList();
+        Map<Long, BigDecimal> prices = Map.of();
+        WashMode mode = null;
+        try {
+            prices = washModeService.requirePrices(req.washModeId(),
+                    errors.isEmpty() ? serviceIds : List.of(), false);
+            mode = washModeRepository.findById(req.washModeId()).orElseThrow();
+        } catch (BusinessException e) {
+            errors.put(e.getField(), e.getMessage());
         }
         boolean whites = Boolean.TRUE.equals(req.washWhitesSeparately());
         if (whites && services.stream().noneMatch(s -> Boolean.TRUE.equals(s.getWhitesApplicable()))) {
@@ -154,12 +164,10 @@ public class OnlineBookingService {
                 settingService.getValue(SettingKey.BOOKING_MIN_LEAD_HOURS, Integer.class));
         if (appointmentError != null) {
             errors.put("appointmentAt", appointmentError);
-        } else {
-            // Chỉ kiểm giờ nhận lại khi giờ gửi hợp lệ; khoảng cách tối thiểu theo hình thức giặt
-            SettingKey gapKey = express
-                    ? SettingKey.BOOKING_RETURN_GAP_HOURS_EXPRESS : SettingKey.BOOKING_RETURN_GAP_HOURS_NORMAL;
+        } else if (mode != null) {
+            // Chỉ kiểm giờ nhận lại khi giờ gửi và hình thức hợp lệ; tối thiểu = giờ hoàn thành của hình thức (FR-015)
             String e = AppointmentRules.returnError(req.returnAt(), req.appointmentAt(), open, close,
-                    settingService.getValue(gapKey, Integer.class));
+                    mode.getCompletionHours());
             if (e != null) errors.put("returnAt", e);
         }
 
@@ -200,8 +208,11 @@ public class OnlineBookingService {
                 .customerName(customer.getFullName())
                 .customerPhone(customer.getPhone())
                 .createdBy(performedBy)
-                .orderType(req.orderType())
-                .requestedServiceIds(services.stream().map(LaundryService::getId).toList())
+                .washModeId(mode.getId())
+                .washModeName(mode.getName())
+                .washModeHours(mode.getCompletionHours())
+                .requestedServicePrices(new LinkedHashMap<>(prices))
+                .requestedServiceIds(serviceIds)
                 .washWhitesSeparately(whites)
                 .totalAmount(BigDecimal.ZERO)
                 .status(OrderStatus.PENDING_CONFIRMATION)

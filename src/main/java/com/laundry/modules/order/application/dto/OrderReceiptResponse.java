@@ -3,9 +3,7 @@ package com.laundry.modules.order.application.dto;
 import com.laundry.modules.order.domain.ItemUnit;
 import com.laundry.modules.order.domain.Order;
 import com.laundry.modules.order.domain.OrderPriority;
-import com.laundry.modules.order.domain.OrderType;
 import com.laundry.modules.order.domain.PaymentStatus;
-import com.laundry.modules.order.domain.ServiceType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -17,14 +15,13 @@ public record OrderReceiptResponse(
         String orderCode,
         String customerName,
         String customerPhone,
-        ServiceType serviceType,
-        String serviceName,
         BigDecimal totalWeight,
         BigDecimal unitPrice,
         BigDecimal totalAmount,
         String note,
         OrderPriority priority,
-        OrderType orderType,
+        Long washModeId,
+        String washModeName,
         PaymentStatus paymentStatus,
         Integer bagCount,
         Instant receivedAt,
@@ -42,7 +39,7 @@ public record OrderReceiptResponse(
         Integer compensationMultiplier,
         BigDecimal compensationCap
 ) {
-    /** Dịch vụ tham khảo kèm giá hiện hành (giá tham khảo, chưa chốt). */
+    /** Dịch vụ kèm đơn giá đã chụp lúc tạo đơn; expressSurcharge chỉ có ở đơn giặt nhanh cũ (null với đơn mới, FR-022). */
     public record ReceiptServiceLine(String name, ItemUnit unit, BigDecimal unitPrice,
                                      BigDecimal expressSurcharge, BigDecimal minQuantity) {
     }
@@ -63,14 +60,13 @@ public record OrderReceiptResponse(
                 order.getOrderCode(),
                 order.getCustomerName(),
                 order.getCustomerPhone(),
-                order.getServiceType(),
-                order.getServiceType() != null ? order.getServiceType().getDisplayName() : null,
                 order.getTotalWeight(),
                 order.getUnitPrice(),
                 order.getTotalAmount(),
                 order.getNote(),
                 order.getPriority(),
-                order.getOrderType(),
+                order.getWashModeId(),
+                order.getWashModeName(),
                 order.getPaymentStatus(),
                 order.getBagCount(),
                 order.getReceivedAt(),

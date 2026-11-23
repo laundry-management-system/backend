@@ -5,6 +5,7 @@ import com.laundry.modules.setting.application.dto.PublicBookingSettingsResponse
 import com.laundry.modules.setting.application.dto.PublicServiceAreaResponse;
 import com.laundry.modules.setting.application.dto.PublicServiceResponse;
 import com.laundry.modules.setting.application.dto.PublicStoreResponse;
+import com.laundry.modules.setting.application.dto.PublicWashModeResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
@@ -37,6 +38,12 @@ public class PublicSiteController {
     @GetMapping("/services")
     public ResponseEntity<List<PublicServiceResponse>> services() {
         return ResponseEntity.ok().cacheControl(CACHE).body(publicSiteService.getServices());
+    }
+
+    @Operation(summary = "Hình thức giặt đang hoạt động, mặc định trước rồi giờ hoàn thành giảm dần, tên, id")
+    @GetMapping("/wash-modes")
+    public ResponseEntity<List<PublicWashModeResponse>> washModes() {
+        return ResponseEntity.ok().cacheControl(CACHE).body(publicSiteService.getWashModes());
     }
 
     @Operation(summary = "Khu vực đang phục vụ và phí giao nhận")

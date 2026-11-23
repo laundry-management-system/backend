@@ -1,7 +1,6 @@
 package com.laundry.modules.booking.application.dto;
 
 import com.laundry.modules.order.domain.DropoffMethod;
-import com.laundry.modules.order.domain.OrderType;
 import com.laundry.modules.order.domain.ReturnMethod;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.AssertTrue;
@@ -22,7 +21,7 @@ public record CreateBookingIntakeRequest(
         List<@Valid Item> items,
 
         @NotNull(message = "Chọn hình thức giặt")
-        OrderType orderType,
+        Long washModeId,
 
         Boolean washWhitesSeparately,
 

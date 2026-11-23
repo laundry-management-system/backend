@@ -51,7 +51,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
           AND o.status IN :statuses
           AND (:channel IS NULL OR o.channel = :channel)
           AND (:priority IS NULL OR o.priority = :priority)
-          AND (:orderType IS NULL OR o.orderType = :orderType)
+          AND (:washModeId IS NULL OR o.washModeId = :washModeId)
           AND (:classified IS NULL OR (:classified = true AND SIZE(o.items) > 0) OR (:classified = false AND SIZE(o.items) = 0))
           AND (:late IS NULL OR :late = false
                OR (o.dueAt < :now AND o.status IN (com.laundry.modules.order.domain.OrderStatus.RECEIVED,
@@ -69,7 +69,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             @Param("statuses") List<OrderStatus> statuses,
             @Param("channel") OrderChannel channel,
             @Param("priority") OrderPriority priority,
-            @Param("orderType") OrderType orderType,
+            @Param("washModeId") Long washModeId,
             @Param("classified") Boolean classified,
             @Param("late") Boolean late,
             @Param("now") Instant now,
@@ -79,6 +79,27 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             @Param("search") String search,
             @Param("intakeCode") String intakeCode,
             Pageable pageable
+    );
+
+    /** Đơn đang mở theo hình thức giặt, gồm cả hình thức đã ngừng; bỏ đơn cũ chưa có hình thức. */
+    @Query("""
+        SELECT o.washModeId, COUNT(o) FROM Order o
+        WHERE o.status IN (com.laundry.modules.order.domain.OrderStatus.RECEIVED, com.laundry.modules.order.domain.OrderStatus.PROCESSING)
+          AND o.washModeId IS NOT NULL
+          AND (:channel IS NULL OR o.channel = :channel)
+          AND (CAST(:dueStart AS instant) IS NULL OR o.dueAt >= :dueStart)
+          AND (CAST(:dueEnd AS instant) IS NULL OR o.dueAt < :dueEnd)
+          AND (:phone IS NULL OR o.customerPhone LIKE CONCAT('%', CAST(:phone AS string), '%'))
+          AND (:search IS NULL OR LOWER(o.orderCode) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%')
+                                OR LOWER(o.customerName) LIKE CONCAT('%', LOWER(CAST(:search AS string)), '%'))
+        GROUP BY o.washModeId
+    """)
+    List<Object[]> countOpenByMode(
+            @Param("channel") OrderChannel channel,
+            @Param("dueStart") Instant dueStart,
+            @Param("dueEnd") Instant dueEnd,
+            @Param("phone") String phone,
+            @Param("search") String search
     );
 
     /** Hai trạng thái trước nhận đồ chỉ vào bộ đếm riêng, không vào các tab còn lại (FR-016). */
@@ -92,9 +113,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
                                  THEN 1 ELSE 0 END), 0) AS processing,
                COALESCE(SUM(CASE WHEN o.status IN (com.laundry.modules.order.domain.OrderStatus.RECEIVED, com.laundry.modules.order.domain.OrderStatus.PROCESSING)
                                   AND o.dueAt < :now THEN 1 ELSE 0 END), 0) AS late,
-               COALESCE(SUM(CASE WHEN o.status IN (com.laundry.modules.order.domain.OrderStatus.RECEIVED, com.laundry.modules.order.domain.OrderStatus.PROCESSING)
-                                  AND o.orderType = com.laundry.modules.order.domain.OrderType.EXPRESS
-                                 THEN 1 ELSE 0 END), 0) AS express,
                COALESCE(SUM(CASE WHEN o.status = com.laundry.modules.order.domain.OrderStatus.PENDING_CONFIRMATION
                                  THEN 1 ELSE 0 END), 0) AS pendingConfirmation,
                COALESCE(SUM(CASE WHEN o.status = com.laundry.modules.order.domain.OrderStatus.AWAITING_DROPOFF

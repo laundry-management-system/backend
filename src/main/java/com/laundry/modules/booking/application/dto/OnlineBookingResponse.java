@@ -4,7 +4,6 @@ import com.laundry.modules.order.domain.DropoffMethod;
 import com.laundry.modules.order.domain.Order;
 import com.laundry.modules.order.domain.OrderFulfillment;
 import com.laundry.modules.order.domain.OrderStatus;
-import com.laundry.modules.order.domain.OrderType;
 import com.laundry.modules.order.domain.ReturnMethod;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -15,7 +14,8 @@ public record OnlineBookingResponse(String intakeCode, boolean created, List<Ord
 
     public record OrderSummary(
             String orderCode,
-            OrderType orderType,
+            Long washModeId,
+            String washModeName,
             OrderStatus status,
             Instant createdAt,
             Instant appointmentAt,
@@ -45,7 +45,7 @@ public record OnlineBookingResponse(String intakeCode, boolean created, List<Ord
 
     private static OrderSummary summary(Order o, Map<Long, String> serviceNames) {
         OrderFulfillment f = o.getFulfillment();
-        return new OrderSummary(o.getOrderCode(), o.getOrderType(), o.getStatus(), o.getCreatedAt(),
+        return new OrderSummary(o.getOrderCode(), o.getWashModeId(), o.getWashModeName(), o.getStatus(), o.getCreatedAt(),
                 f.getAppointmentAt(), o.getDueAt(), f.getContactName(), f.getContactPhone(),
                 f.getDropoffMethod(), f.getReturnMethod(), f.getPickupAreaName(), f.getDeliveryAreaName(),
                 f.getPickupAddress(),

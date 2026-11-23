@@ -17,7 +17,11 @@ public record PriceHistoryRowResponse(
         String serviceName,
         ServiceUnit unit,
         PriceField field,
-        @Schema(description = "Giá trị cũ dạng chuỗi (tiền, số giờ, tên trạng thái); null khi không có", example = "25000")
+        @Schema(description = "Id hình thức giặt khi field = MODE_PRICE, còn lại null", example = "2")
+        Long washModeId,
+        @Schema(description = "Tên hình thức giặt hiện tại khi field = MODE_PRICE, còn lại null", example = "Giặt nhanh")
+        String washModeName,
+        @Schema(description = "Giá trị cũ dạng chuỗi (tiền, số giờ, tên trạng thái); null khi không có (MODE_PRICE: null = không hỗ trợ)", example = "25000")
         String oldValue,
         @Schema(example = "28000")
         String newValue,

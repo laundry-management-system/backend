@@ -7,7 +7,6 @@ import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.order.domain.OrderFulfillment;
 import com.laundry.modules.order.domain.OrderItem;
 import com.laundry.modules.order.domain.OrderStatus;
-import com.laundry.modules.order.domain.OrderType;
 import com.laundry.modules.order.domain.PaymentStatus;
 import com.laundry.modules.order.domain.ReturnMethod;
 import com.laundry.modules.order.domain.ReturnStatus;
@@ -24,7 +23,8 @@ public record CustomerPortalOrderResponse(
         String orderCode,
         Instant createdAt,
         OrderChannel channel,
-        OrderType orderType,
+        Long washModeId,
+        String washModeName,
         Fulfillment fulfillment,
         String customerRejectReason,
         Instant receivedAt,
@@ -66,7 +66,7 @@ public record CustomerPortalOrderResponse(
                 f.getPickupTrackingCode(), f.getDeliveryTrackingCode(), f.getPickupFee(), f.getDeliveryFee(),
                 f.getPickupAreaName(), f.getPickupAddress(), f.getDeliveryAreaName(), f.getDeliveryAddress());
         return new CustomerPortalOrderResponse(order.getOrderCode(), order.getCreatedAt(), order.getChannel(),
-                order.getOrderType(), fulfillment, f == null ? null : f.getCustomerRejectReason(),
+                order.getWashModeId(), order.getWashModeName(), fulfillment, f == null ? null : f.getCustomerRejectReason(),
                 order.getReceivedAt(), order.getStatus(), order.getTotalAmount(), classified ? order.payableAmount() : null, classified, services, whitesFee,
                 order.getPaymentStatus(), order.getPaymentClaimedAt());
     }

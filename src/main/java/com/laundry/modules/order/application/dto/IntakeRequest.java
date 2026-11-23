@@ -6,9 +6,11 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+/** Một lượt nhận = một đơn theo một hình thức giặt. dueAt bỏ trống thì server đặt hạn tối thiểu. */
 public record IntakeRequest(
         @NotNull(message = "Thiếu mã yêu cầu")
         UUID requestId,
@@ -21,8 +23,16 @@ public record IntakeRequest(
         @Size(max = 100, message = "Họ tên tối đa 100 ký tự")
         String customerName,
 
+        @NotNull(message = "Vui lòng chọn hình thức giặt")
+        Long washModeId,
+
         @NotEmpty(message = "Chọn ít nhất một dịch vụ")
-        @Size(max = 2, message = "Mỗi lượt nhận tối đa 2 đơn")
-        List<@Valid IntakeOrderRequest> orders
+        List<@Valid @NotNull Item> items,
+
+        boolean washWhitesSeparately,
+
+        Instant dueAt
 ) {
+    public record Item(@NotNull(message = "Thiếu dịch vụ") Long serviceId) {
+    }
 }

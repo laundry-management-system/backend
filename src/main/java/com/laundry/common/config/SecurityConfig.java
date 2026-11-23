@@ -54,7 +54,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(PUBLIC_PATHS).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/public/store", "/api/public/services", "/api/public/service-areas", "/api/public/booking-settings").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/public/store", "/api/public/services", "/api/public/wash-modes", "/api/public/service-areas", "/api/public/booking-settings").permitAll()
                         .requestMatchers("/api/customer-portal/**").hasRole("CUSTOMER")
                         // Phần lớn controller quản trị không có @PreAuthorize nên phải chặn token khách ở đây
                         .anyRequest().hasAnyRole("ADMIN", "STAFF"))

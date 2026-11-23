@@ -4,32 +4,28 @@ import com.laundry.modules.service.application.dto.ServiceResponse;
 import com.laundry.modules.service.domain.ServiceUnit;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
+import java.util.List;
 
 @Schema(description = "Dịch vụ đang hoạt động trên bảng giá công khai, không có dữ liệu audit")
 public record PublicServiceResponse(
         Long id,
         String name,
         ServiceUnit unit,
-        BigDecimal price,
         BigDecimal minQuantity,
-        Integer standardHours,
-        Boolean expressSupported,
-        @Schema(nullable = true) BigDecimal expressSurcharge,
-        @Schema(nullable = true) Integer expressHours,
-        Boolean whitesApplicable
+        Boolean whitesApplicable,
+        List<ModePrice> prices
 ) {
-    public static PublicServiceResponse from(ServiceResponse service) {
+    public record ModePrice(Long washModeId, BigDecimal price) {}
+
+    public static PublicServiceResponse from(ServiceResponse service, java.util.Set<Long> activeModeIds) {
         return new PublicServiceResponse(
                 service.id(),
                 service.name(),
                 service.unit(),
-                service.currentPrice(),
                 service.minQuantity(),
-                service.standardHours(),
-                service.expressSupported(),
-                service.expressSurcharge(),
-                service.expressHours(),
-                service.whitesApplicable()
+                service.whitesApplicable(),
+                service.prices().stream().filter(p -> activeModeIds.contains(p.washModeId()))
+                        .map(p -> new ModePrice(p.washModeId(), p.price())).toList()
         );
     }
 }

@@ -2,13 +2,17 @@ package com.laundry.modules.service.domain;
 
 import com.laundry.common.entity.BaseEntity;
 import com.laundry.common.exception.BusinessException;
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Index;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -40,22 +44,6 @@ public class LaundryService extends BaseEntity {
     @Column(name = "unit", nullable = false, length = 20)
     private ServiceUnit unit;
 
-    @Column(name = "current_price", nullable = false, precision = 12, scale = 0)
-    private BigDecimal currentPrice;
-
-    @Column(name = "standard_hours", nullable = false)
-    private Integer standardHours;
-
-    @Column(name = "express_supported", nullable = false)
-    @Builder.Default
-    private Boolean expressSupported = false;
-
-    @Column(name = "express_surcharge", precision = 12, scale = 0)
-    private BigDecimal expressSurcharge;
-
-    @Column(name = "express_hours")
-    private Integer expressHours;
-
     // Chỉ hiển thị ở quầy; chốt vào dòng đồ lúc phân loại
     @Column(name = "min_quantity", nullable = false, precision = 10, scale = 2, columnDefinition = "numeric(10,2) default 0")
     @Builder.Default
@@ -65,15 +53,16 @@ public class LaundryService extends BaseEntity {
     @Builder.Default
     private Boolean whitesApplicable = false;
 
+    @OneToMany(mappedBy = "service", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<ServiceWashModePrice> prices = new ArrayList<>();
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
     private ServiceStatus status = ServiceStatus.ACTIVE;
 
     public void validateBusinessRules() {
-        if (this.currentPrice == null || this.currentPrice.compareTo(BigDecimal.ZERO) < 0) {
-            throw new BusinessException("Đơn giá không được âm");
-        }
         if (this.minQuantity == null || this.minQuantity.signum() < 0) {
             throw new BusinessException("Tối thiểu không được âm", "minQuantity");
         }
@@ -83,49 +72,6 @@ public class LaundryService extends BaseEntity {
                     ? "Tối thiểu phải là số nguyên với đơn vị này"
                     : "Tối thiểu tối đa 2 chữ số thập phân", "minQuantity");
         }
-        if (this.standardHours == null || this.standardHours <= 0) {
-            throw new BusinessException("Thời gian xử lý chuẩn phải lớn hơn 0 giờ");
-        }
-        if (Boolean.TRUE.equals(this.expressSupported)) {
-            if (this.expressSurcharge == null || this.expressSurcharge.compareTo(BigDecimal.ZERO) < 0) {
-                throw new BusinessException("Phụ phí giặt nhanh không được âm");
-            }
-            if (this.expressHours == null || this.expressHours <= 0) {
-                throw new BusinessException("Thời gian giặt nhanh phải lớn hơn 0 giờ");
-            }
-            if (this.expressHours >= this.standardHours) {
-                throw new BusinessException("Thời gian giặt nhanh (" + this.expressHours + " giờ) phải ngắn hơn thời gian xử lý chuẩn (" + this.standardHours + " giờ)");
-            }
-        }
-    }
-
-    public void updateDetails(
-            String name,
-            ServiceUnit unit,
-            BigDecimal currentPrice,
-            Integer standardHours,
-            Boolean expressSupported,
-            BigDecimal expressSurcharge,
-            Integer expressHours
-    ) {
-        if (name != null && !name.trim().isEmpty()) {
-            this.name = name.trim();
-        }
-        if (unit != null) {
-            this.unit = unit;
-        }
-        if (currentPrice != null) {
-            this.currentPrice = currentPrice;
-        }
-        if (standardHours != null) {
-            this.standardHours = standardHours;
-        }
-        if (expressSupported != null) {
-            this.expressSupported = expressSupported;
-        }
-        this.expressSurcharge = expressSurcharge;
-        this.expressHours = expressHours;
-        validateBusinessRules();
     }
 
     public void deactivate() {

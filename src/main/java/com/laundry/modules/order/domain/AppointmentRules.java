@@ -5,12 +5,29 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 
 public final class AppointmentRules {
 
     private static final ZoneId VN = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private AppointmentRules() {
+    }
+
+    /** Hẹn trả = nhận + giờ hoàn thành, làm tròn lên 30 phút, rồi kéo vào giờ mở cửa [open, close) (VN). */
+    public static Instant dueAtFor(Instant receivedAt, int completionHours, LocalTime open, LocalTime close) {
+        ZonedDateTime exact = receivedAt.plusSeconds(completionHours * 3600L).atZone(VN);
+        ZonedDateTime d = exact.truncatedTo(ChronoUnit.HOURS).plusMinutes(exact.getMinute() / 30 * 30L);
+        if (d.isBefore(exact)) {
+            d = d.plusMinutes(30);
+        }
+        LocalTime t = d.toLocalTime();
+        if (t.isBefore(open)) {
+            d = d.with(open);
+        } else if (!t.isBefore(close)) {
+            d = d.plusDays(1).with(open);
+        }
+        return d.toInstant();
     }
 
     /** Trả câu lỗi đầu tiên vi phạm quy tắc giờ hẹn, hoặc null nếu hợp lệ (R9). */

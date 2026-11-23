@@ -12,8 +12,6 @@ import com.laundry.modules.order.application.dto.CancelOrderRequest;
 import com.laundry.modules.order.application.dto.ChangeStatusRequest;
 import com.laundry.modules.order.application.dto.CompleteOrderRequest;
 import com.laundry.modules.order.application.dto.CustomerTrackingResponse;
-import com.laundry.modules.order.application.dto.EstimateReturnTimeRequest;
-import com.laundry.modules.order.application.dto.EstimateReturnTimeResponse;
 import com.laundry.modules.order.application.dto.IntakeRequest;
 import com.laundry.modules.order.application.dto.IntakeResponse;
 import com.laundry.modules.order.application.dto.OrderDetailResponse;
@@ -21,7 +19,6 @@ import com.laundry.modules.order.application.dto.OrderFilter;
 import com.laundry.modules.order.application.dto.OrderImageDto;
 import com.laundry.modules.order.application.dto.OrderReceiptResponse;
 import com.laundry.modules.order.application.dto.OrderResponse;
-import com.laundry.modules.order.application.dto.QuickCreateOrderRequest;
 import com.laundry.modules.order.application.dto.RejectOrderRequest;
 import com.laundry.modules.order.application.dto.RejectPaymentClaimRequest;
 import com.laundry.modules.order.application.dto.RescheduleAppointmentRequest;
@@ -32,7 +29,6 @@ import com.laundry.modules.order.application.dto.WorkCountsResponse;
 import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.order.domain.OrderPriority;
 import com.laundry.modules.order.domain.OrderStatus;
-import com.laundry.modules.order.domain.OrderType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -64,17 +60,6 @@ public class OrderController {
 
     private final OrderService orderService;
 
-    @Operation(summary = "Tiếp nhận đồ & tạo đơn (UC04 / BM3 - Fast Check-in)")
-    @PostMapping("/quick-create")
-    @ResponseStatus(HttpStatus.CREATED)
-    public OrderDetailResponse quickCreate(
-            @Valid @RequestBody QuickCreateOrderRequest request,
-            Authentication authentication
-    ) {
-        String staff = getUsername(authentication);
-        return orderService.quickCreate(request, staff);
-    }
-
     @Operation(summary = "Tiếp nhận đồ v3: tạo lượt nhận 1–2 đơn (Tiêu chuẩn / Giặt nhanh), chưa có dòng đồ và giá")
     @PostMapping("/intake")
     public ResponseEntity<IntakeResponse> createIntake(
@@ -97,14 +82,6 @@ public class OrderController {
             baseUrl = "http://localhost:5173";
         }
         return orderService.getReceipt(id, baseUrl);
-    }
-
-    @Operation(summary = "Tính tiền & gợi ý ngày hẹn (UC04 - include)")
-    @PostMapping("/estimate-return-time")
-    public EstimateReturnTimeResponse estimateReturnTime(
-            @Valid @RequestBody EstimateReturnTimeRequest request
-    ) {
-        return orderService.estimateReturnTime(request);
     }
 
     @Operation(summary = "Nhập danh sách chi tiết các món đồ sau khi kiểm đếm (UC04)")
@@ -157,7 +134,7 @@ public class OrderController {
             @RequestParam(required = false) List<OrderStatus> statuses,
             @RequestParam(required = false) OrderChannel channel,
             @RequestParam(required = false) OrderPriority priority,
-            @RequestParam(required = false) OrderType orderType,
+            @RequestParam(required = false) Long washModeId,
             @RequestParam(required = false) Boolean classified,
             @RequestParam(required = false) Boolean late,
             @RequestParam(required = false) String dueFrom,
@@ -168,7 +145,7 @@ public class OrderController {
             @PageableDefault(size = 20) Pageable pageable
     ) {
         OrderFilter filter = OrderFilter.of(status, statuses, channel, priority, phone, search, intakeCode,
-                orderType, classified, late, dueFrom, dueTo);
+                washModeId, classified, late, dueFrom, dueTo);
         return orderService.getOrders(filter, pageable);
     }
 

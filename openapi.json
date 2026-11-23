@@ -73,6 +73,10 @@
             "description": "Khách xem đơn của mình"
         },
         {
+            "name": "Wash Modes",
+            "description": "Dynamic wash modes (Admin & Staff read, Admin write; no delete)"
+        },
+        {
             "name": "Service areas",
             "description": "Khu vực và phí giao nhận (Admin)"
         },
@@ -94,6 +98,78 @@
         }
     ],
     "paths": {
+        "/api/wash-modes/{id}": {
+            "get": {
+                "tags": [
+                    "Wash Modes"
+                ],
+                "summary": "Wash mode detail with service prices (Staff & Admin)",
+                "operationId": "get",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int64"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WashModeDetailResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "tags": [
+                    "Wash Modes"
+                ],
+                "summary": "Update wash mode, also deactivate/reactivate via active (Admin only)",
+                "operationId": "update",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "format": "int64"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WashModeRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WashModeDetailResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/vouchers/{id}": {
             "get": {
                 "tags": [
@@ -245,7 +321,7 @@
                     "Service areas"
                 ],
                 "summary": "Sửa tên, phí lượt lấy, phí lượt giao",
-                "operationId": "update",
+                "operationId": "update_1",
                 "parameters": [
                     {
                         "name": "id",
@@ -443,7 +519,7 @@
                     "Incidents"
                 ],
                 "summary": "Chi tiết phiếu sự cố kèm ảnh ban đầu để đối chiếu",
-                "operationId": "get",
+                "operationId": "get_1",
                 "parameters": [
                     {
                         "name": "id",
@@ -473,7 +549,7 @@
                     "Incidents"
                 ],
                 "summary": "Sửa phiếu đang chờ duyệt",
-                "operationId": "update_1",
+                "operationId": "update_2",
                 "parameters": [
                     {
                         "name": "id",
@@ -726,6 +802,59 @@
                             "*/*": {
                                 "schema": {
                                     "$ref": "#/components/schemas/AuthenticationResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/wash-modes": {
+            "get": {
+                "tags": [
+                    "Wash Modes"
+                ],
+                "summary": "All wash modes incl. inactive, default first, then completionHours desc, name, id (Staff & Admin)",
+                "operationId": "list",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/WashModeResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Wash Modes"
+                ],
+                "summary": "Create wash mode (Admin only)",
+                "operationId": "create",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WashModeRequest"
+                            }
+                        }
+                    },
+                    "required": true
+                },
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WashModeDetailResponse"
                                 }
                             }
                         }
@@ -1019,7 +1148,7 @@
                 "tags": [
                     "Shifts"
                 ],
-                "operationId": "list",
+                "operationId": "list_1",
                 "parameters": [
                     {
                         "name": "from",
@@ -1269,7 +1398,7 @@
                     "Service areas"
                 ],
                 "summary": "Mọi khu vực, cả đang và ngừng phục vụ, theo thứ tự thêm",
-                "operationId": "list_1",
+                "operationId": "list_2",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1291,7 +1420,7 @@
                     "Service areas"
                 ],
                 "summary": "Thêm khu vực (đang phục vụ)",
-                "operationId": "create",
+                "operationId": "create_1",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -1402,7 +1531,7 @@
                 "tags": [
                     "Payments"
                 ],
-                "operationId": "list_2",
+                "operationId": "list_3",
                 "parameters": [
                     {
                         "name": "orderCode",
@@ -1885,8 +2014,12 @@
                                 }
                             }
                         }
+                    },
+                    "400": {
+                        "description": "Lỗi field `dueAt` \"Hạn trả phải từ <minDue> trở đi\" khi trễ giờ hẹn và hạn trả hiện tại sớm hơn minDue mà dueAt sớm hơn minDue; \"Hạn trả hiện tại vẫn kịp nên không đổi được\" ở mọi ca khác (đúng hẹn, hoặc trễ mà hạn trả hiện tại vẫn ≥ minDue) khi dueAt khác hạn trả hiện tại."
                     }
-                }
+                },
+                "description": "minDue = max(dueAt, giờ nhận + washModeHours, làm tròn 30 phút trong giờ mở cửa) nếu nhận muộn hơn appointmentAt, ngược lại = dueAt. dueAt bỏ trống = minDue; muộn hơn thì nhận; khác dueAt cũ thì ghi RESCHEDULE (FR-039)."
             }
         },
         "/api/orders/{id}/confirm": {
@@ -2005,37 +2138,6 @@
                 }
             }
         },
-        "/api/orders/quick-create": {
-            "post": {
-                "tags": [
-                    "Order Management"
-                ],
-                "summary": "Tiếp nhận đồ & tạo đơn (UC04 / BM3 - Fast Check-in)",
-                "operationId": "quickCreate",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/QuickCreateOrderRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/OrderDetailResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/api/orders/intake": {
             "post": {
                 "tags": [
@@ -2060,37 +2162,6 @@
                             "*/*": {
                                 "schema": {
                                     "$ref": "#/components/schemas/IntakeResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/orders/estimate-return-time": {
-            "post": {
-                "tags": [
-                    "Order Management"
-                ],
-                "summary": "Tính tiền & gợi ý ngày hẹn (UC04 - include)",
-                "operationId": "estimateReturnTime",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "$ref": "#/components/schemas/EstimateReturnTimeRequest"
-                            }
-                        }
-                    },
-                    "required": true
-                },
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {
-                            "*/*": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/EstimateReturnTimeResponse"
                                 }
                             }
                         }
@@ -2218,7 +2289,7 @@
                     "Incidents"
                 ],
                 "summary": "Danh sách phiếu sự cố (lọc trạng thái, từ khóa mã sự cố / mã đơn / SĐT, loại, ngày lập, đơn)",
-                "operationId": "list_3",
+                "operationId": "list_4",
                 "parameters": [
                     {
                         "name": "status",
@@ -2310,7 +2381,7 @@
                     "Incidents"
                 ],
                 "summary": "Lập phiếu sự cố (UC15)",
-                "operationId": "create_1",
+                "operationId": "create_2",
                 "requestBody": {
                     "content": {
                         "application/json": {
@@ -3224,9 +3295,7 @@
                                 "BOOKING_DELIVERY_ENABLED",
                                 "BOOKING_MIN_LEAD_HOURS",
                                 "BOOKING_MAX_OPEN_PER_CUSTOMER",
-                                "BOOKING_PICKUP_MIN_AMOUNT",
-                                "BOOKING_RETURN_GAP_HOURS_NORMAL",
-                                "BOOKING_RETURN_GAP_HOURS_EXPRESS"
+                                "BOOKING_PICKUP_MIN_AMOUNT"
                             ]
                         }
                     }
@@ -3873,6 +3942,7 @@
                         "schema": {
                             "type": "string",
                             "enum": [
+                                "MODE_PRICE",
                                 "PRICE",
                                 "EXPRESS_SURCHARGE",
                                 "STANDARD_HOURS",
@@ -4230,6 +4300,30 @@
                 }
             }
         },
+        "/api/public/wash-modes": {
+            "get": {
+                "tags": [
+                    "Public site"
+                ],
+                "summary": "Hình thức giặt đang hoạt động, mặc định trước rồi giờ hoàn thành giảm dần, tên, id",
+                "operationId": "washModes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/PublicWashModeResponse"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/public/store": {
             "get": {
                 "tags": [
@@ -4392,15 +4486,12 @@
                         }
                     },
                     {
-                        "name": "orderType",
+                        "name": "washModeId",
                         "in": "query",
                         "required": false,
                         "schema": {
-                            "type": "string",
-                            "enum": [
-                                "NORMAL",
-                                "EXPRESS"
-                            ]
+                            "type": "integer",
+                            "format": "int64"
                         }
                     },
                     {
@@ -5269,6 +5360,112 @@
     },
     "components": {
         "schemas": {
+            "ServiceLine": {
+                "type": "object",
+                "properties": {
+                    "serviceId": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "price": {
+                        "type": "number",
+                        "minimum": 0
+                    }
+                },
+                "required": [
+                    "price",
+                    "serviceId"
+                ]
+            },
+            "WashModeRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 50,
+                        "minLength": 0
+                    },
+                    "completionHours": {
+                        "type": "number",
+                        "maximum": 720,
+                        "minimum": 1
+                    },
+                    "active": {
+                        "type": "boolean"
+                    },
+                    "isDefault": {
+                        "type": "boolean"
+                    },
+                    "services": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ServiceLine"
+                        }
+                    }
+                },
+                "required": [
+                    "completionHours",
+                    "name"
+                ]
+            },
+            "ModeServiceLine": {
+                "type": "object",
+                "properties": {
+                    "serviceId": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "serviceCode": {
+                        "type": "string"
+                    },
+                    "serviceName": {
+                        "type": "string"
+                    },
+                    "unit": {
+                        "type": "string",
+                        "enum": [
+                            "KG",
+                            "PIECE",
+                            "SET",
+                            "PRODUCT"
+                        ]
+                    },
+                    "price": {
+                        "type": "number"
+                    }
+                }
+            },
+            "WashModeDetailResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "completionHours": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "active": {
+                        "type": "boolean"
+                    },
+                    "isDefault": {
+                        "type": "boolean"
+                    },
+                    "services": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ModeServiceLine"
+                        }
+                    }
+                }
+            },
             "UpdateVoucherRequest": {
                 "type": "object",
                 "properties": {
@@ -5375,6 +5572,23 @@
                     }
                 }
             },
+            "PriceLine": {
+                "type": "object",
+                "properties": {
+                    "washModeId": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "price": {
+                        "type": "number",
+                        "minimum": 0
+                    }
+                },
+                "required": [
+                    "price",
+                    "washModeId"
+                ]
+            },
             "UpdateServiceRequest": {
                 "type": "object",
                 "properties": {
@@ -5392,26 +5606,12 @@
                             "PRODUCT"
                         ]
                     },
-                    "currentPrice": {
-                        "type": "number",
-                        "minimum": 0
-                    },
-                    "standardHours": {
-                        "type": "integer",
-                        "format": "int32",
-                        "minimum": 1
-                    },
-                    "expressSupported": {
-                        "type": "boolean"
-                    },
-                    "expressSurcharge": {
-                        "type": "number",
-                        "minimum": 0
-                    },
-                    "expressHours": {
-                        "type": "integer",
-                        "format": "int32",
-                        "minimum": 1
+                    "prices": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PriceLine"
+                        },
+                        "minItems": 1
                     },
                     "minQuantity": {
                         "type": "number",
@@ -5431,6 +5631,24 @@
                         "type": "string",
                         "maxLength": 500,
                         "minLength": 0
+                    }
+                },
+                "required": [
+                    "prices"
+                ]
+            },
+            "ServicePrice": {
+                "type": "object",
+                "properties": {
+                    "washModeId": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "washModeName": {
+                        "type": "string"
+                    },
+                    "price": {
+                        "type": "number"
                     }
                 }
             },
@@ -5459,23 +5677,6 @@
                     "unitDisplayName": {
                         "type": "string"
                     },
-                    "currentPrice": {
-                        "type": "number"
-                    },
-                    "standardHours": {
-                        "type": "integer",
-                        "format": "int32"
-                    },
-                    "expressSupported": {
-                        "type": "boolean"
-                    },
-                    "expressSurcharge": {
-                        "type": "number"
-                    },
-                    "expressHours": {
-                        "type": "integer",
-                        "format": "int32"
-                    },
                     "minQuantity": {
                         "type": "number"
                     },
@@ -5496,6 +5697,12 @@
                     "updatedAt": {
                         "type": "string",
                         "format": "date-time"
+                    },
+                    "prices": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ServicePrice"
+                        }
                     }
                 }
             },
@@ -5575,19 +5782,6 @@
                     "customerPhone": {
                         "type": "string"
                     },
-                    "serviceType": {
-                        "type": "string",
-                        "enum": [
-                            "WASH_DRY",
-                            "DRY_CLEAN",
-                            "IRON_ONLY",
-                            "EXPRESS",
-                            "SPECIAL"
-                        ]
-                    },
-                    "serviceName": {
-                        "type": "string"
-                    },
                     "totalWeight": {
                         "type": "number"
                     },
@@ -5623,12 +5817,17 @@
                             "URGENT"
                         ]
                     },
-                    "orderType": {
-                        "type": "string",
-                        "enum": [
-                            "NORMAL",
-                            "EXPRESS"
-                        ]
+                    "washModeId": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "washModeName": {
+                        "type": "string"
+                    },
+                    "washModeHours": {
+                        "type": "integer",
+                        "format": "int32",
+                        "description": "Giờ hoàn thành đã chụp trên đơn (chỉ đọc)"
                     },
                     "status": {
                         "type": "string",
@@ -6034,6 +6233,9 @@
                             "SET",
                             "PRODUCT"
                         ]
+                    },
+                    "unitPrice": {
+                        "type": "number"
                     }
                 }
             },
@@ -6628,12 +6830,12 @@
                             "OFFLINE"
                         ]
                     },
-                    "orderType": {
-                        "type": "string",
-                        "enum": [
-                            "NORMAL",
-                            "EXPRESS"
-                        ]
+                    "washModeId": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "washModeName": {
+                        "type": "string"
                     },
                     "status": {
                         "type": "string",
@@ -7380,26 +7582,12 @@
                             "PRODUCT"
                         ]
                     },
-                    "currentPrice": {
-                        "type": "number",
-                        "minimum": 0
-                    },
-                    "standardHours": {
-                        "type": "integer",
-                        "format": "int32",
-                        "minimum": 1
-                    },
-                    "expressSupported": {
-                        "type": "boolean"
-                    },
-                    "expressSurcharge": {
-                        "type": "number",
-                        "minimum": 0
-                    },
-                    "expressHours": {
-                        "type": "integer",
-                        "format": "int32",
-                        "minimum": 1
+                    "prices": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PriceLine"
+                        },
+                        "minItems": 1
                     },
                     "minQuantity": {
                         "type": "number",
@@ -7410,9 +7598,8 @@
                     }
                 },
                 "required": [
-                    "currentPrice",
                     "name",
-                    "standardHours",
+                    "prices",
                     "unit"
                 ]
             },
@@ -7832,6 +8019,11 @@
                         "type": "string",
                         "maxLength": 50,
                         "minLength": 0
+                    },
+                    "dueAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Hạn trả chọn ở bước xác nhận; bỏ trống = minDue (FR-039)."
                     }
                 }
             },
@@ -7869,121 +8061,6 @@
                     }
                 }
             },
-            "QuickCreateOrderRequest": {
-                "type": "object",
-                "description": "Request tạo đơn nhanh tại quầy (Fast Check-in 15-30 giây - BM3)",
-                "properties": {
-                    "customerName": {
-                        "type": "string",
-                        "description": "Tên khách hàng",
-                        "example": "Nguyễn Văn A",
-                        "minLength": 1
-                    },
-                    "customerPhone": {
-                        "type": "string",
-                        "description": "Số điện thoại khách hàng",
-                        "example": "0987654321",
-                        "minLength": 1,
-                        "pattern": "^(0|\\+84)[0-9]{9,10}$"
-                    },
-                    "serviceType": {
-                        "type": "string",
-                        "description": "Loại hình giặt sấy",
-                        "enum": [
-                            "WASH_DRY",
-                            "DRY_CLEAN",
-                            "IRON_ONLY",
-                            "EXPRESS",
-                            "SPECIAL"
-                        ],
-                        "example": "WASH_DRY"
-                    },
-                    "totalWeight": {
-                        "type": "number",
-                        "description": "Số kg đồ sau khi cân cả túi",
-                        "example": 5.5,
-                        "minimum": 0.01
-                    },
-                    "unitPrice": {
-                        "type": "number",
-                        "description": "Đơn giá theo kg (nếu để trống, hệ thống tự lấy giá mặc định của loại dịch vụ)",
-                        "example": 15000
-                    },
-                    "customerNote": {
-                        "type": "string",
-                        "description": "Ghi chú dặn dò của khách (VD: áo trắng giặt riêng)",
-                        "example": "Áo trắng giặt riêng, không dùng xả thơm"
-                    },
-                    "priority": {
-                        "type": "string",
-                        "description": "Độ ưu tiên xử lý (NORMAL, HIGH, URGENT)",
-                        "enum": [
-                            "NORMAL",
-                            "HIGH",
-                            "URGENT"
-                        ],
-                        "example": "NORMAL"
-                    },
-                    "orderType": {
-                        "type": "string",
-                        "description": "Loại đơn (NORMAL, EXPRESS)",
-                        "enum": [
-                            "NORMAL",
-                            "EXPRESS"
-                        ],
-                        "example": "NORMAL"
-                    },
-                    "bagCount": {
-                        "type": "integer",
-                        "format": "int32",
-                        "description": "Số túi đồ",
-                        "example": 1
-                    },
-                    "dueAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "Ngày hẹn trả khách (nếu để trống, hệ thống tự động gợi ý theo loại dịch vụ)"
-                    }
-                },
-                "required": [
-                    "customerName",
-                    "customerPhone",
-                    "serviceType",
-                    "totalWeight"
-                ]
-            },
-            "IntakeOrderRequest": {
-                "type": "object",
-                "properties": {
-                    "orderType": {
-                        "type": "string",
-                        "enum": [
-                            "NORMAL",
-                            "EXPRESS"
-                        ]
-                    },
-                    "serviceIds": {
-                        "type": "array",
-                        "items": {
-                            "type": "integer",
-                            "format": "int64"
-                        },
-                        "minItems": 1
-                    },
-                    "dueAt": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "washWhitesSeparately": {
-                        "type": "boolean"
-                    }
-                },
-                "required": [
-                    "dueAt",
-                    "orderType",
-                    "serviceIds"
-                ]
-            },
             "IntakeRequest": {
                 "type": "object",
                 "properties": {
@@ -8001,20 +8078,31 @@
                         "maxLength": 100,
                         "minLength": 0
                     },
-                    "orders": {
+                    "washModeId": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "items": {
                         "type": "array",
                         "items": {
-                            "$ref": "#/components/schemas/IntakeOrderRequest"
+                            "$ref": "#/components/schemas/Item"
                         },
-                        "maxItems": 2,
-                        "minItems": 0
+                        "minItems": 1
+                    },
+                    "washWhitesSeparately": {
+                        "type": "boolean"
+                    },
+                    "dueAt": {
+                        "type": "string",
+                        "format": "date-time"
                     }
                 },
                 "required": [
                     "customerName",
                     "customerPhone",
-                    "orders",
-                    "requestId"
+                    "items",
+                    "requestId",
+                    "washModeId"
                 ]
             },
             "IntakeResponse": {
@@ -8035,64 +8123,6 @@
                     },
                     "created": {
                         "type": "boolean"
-                    }
-                }
-            },
-            "EstimateReturnTimeRequest": {
-                "type": "object",
-                "description": "Request gợi ý ngày giờ hẹn trả đồ",
-                "properties": {
-                    "serviceType": {
-                        "type": "string",
-                        "description": "Loại hình giặt sấy",
-                        "enum": [
-                            "WASH_DRY",
-                            "DRY_CLEAN",
-                            "IRON_ONLY",
-                            "EXPRESS",
-                            "SPECIAL"
-                        ],
-                        "example": "WASH_DRY"
-                    },
-                    "priority": {
-                        "type": "string",
-                        "description": "Độ ưu tiên xử lý",
-                        "enum": [
-                            "NORMAL",
-                            "HIGH",
-                            "URGENT"
-                        ],
-                        "example": "NORMAL"
-                    },
-                    "totalWeight": {
-                        "type": "number",
-                        "description": "Số kg đồ",
-                        "example": 5.5
-                    }
-                },
-                "required": [
-                    "serviceType"
-                ]
-            },
-            "EstimateReturnTimeResponse": {
-                "type": "object",
-                "description": "Response gợi ý thời gian hẹn trả đồ",
-                "properties": {
-                    "estimatedReturnAt": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "Thời gian hẹn trả dự kiến được tính toán"
-                    },
-                    "standardHours": {
-                        "type": "integer",
-                        "format": "int32",
-                        "description": "Số giờ xử lý tiêu chuẩn",
-                        "example": 24
-                    },
-                    "explanation": {
-                        "type": "string",
-                        "description": "Diễn giải căn cứ tính toán",
-                        "example": "Dịch vụ giặt sấy tiêu chuẩn (24h) vào ngày thường"
                     }
                 }
             },
@@ -8393,12 +8423,9 @@
                         "maxItems": 20,
                         "minItems": 0
                     },
-                    "orderType": {
-                        "type": "string",
-                        "enum": [
-                            "NORMAL",
-                            "EXPRESS"
-                        ]
+                    "washModeId": {
+                        "type": "integer",
+                        "format": "int64"
                     },
                     "washWhitesSeparately": {
                         "type": "boolean"
@@ -8467,9 +8494,9 @@
                     "appointmentAt",
                     "dropoffMethod",
                     "items",
-                    "orderType",
                     "requestId",
-                    "returnMethod"
+                    "returnMethod",
+                    "washModeId"
                 ]
             },
             "OnlineBookingResponse": {
@@ -8495,12 +8522,12 @@
                     "orderCode": {
                         "type": "string"
                     },
-                    "orderType": {
-                        "type": "string",
-                        "enum": [
-                            "NORMAL",
-                            "EXPRESS"
-                        ]
+                    "washModeId": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "washModeName": {
+                        "type": "string"
                     },
                     "status": {
                         "type": "string",
@@ -8783,9 +8810,7 @@
                             "BOOKING_DELIVERY_ENABLED",
                             "BOOKING_MIN_LEAD_HOURS",
                             "BOOKING_MAX_OPEN_PER_CUSTOMER",
-                            "BOOKING_PICKUP_MIN_AMOUNT",
-                            "BOOKING_RETURN_GAP_HOURS_NORMAL",
-                            "BOOKING_RETURN_GAP_HOURS_EXPRESS"
+                            "BOOKING_PICKUP_MIN_AMOUNT"
                         ]
                     },
                     "value": {
@@ -8982,6 +9007,31 @@
                 "required": [
                     "status"
                 ]
+            },
+            "WashModeResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "completionHours": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "active": {
+                        "type": "boolean"
+                    },
+                    "isDefault": {
+                        "type": "boolean"
+                    }
+                }
             },
             "Pageable": {
                 "type": "object",
@@ -9573,6 +9623,7 @@
                     "field": {
                         "type": "string",
                         "enum": [
+                            "MODE_PRICE",
                             "PRICE",
                             "EXPRESS_SURCHARGE",
                             "STANDARD_HOURS",
@@ -9580,9 +9631,20 @@
                             "STATUS"
                         ]
                     },
+                    "washModeId": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Id hình thức giặt khi field = MODE_PRICE, còn lại null",
+                        "example": 2
+                    },
+                    "washModeName": {
+                        "type": "string",
+                        "description": "Tên hình thức giặt hiện tại khi field = MODE_PRICE, còn lại null",
+                        "example": "Giặt nhanh"
+                    },
                     "oldValue": {
                         "type": "string",
-                        "description": "Giá trị cũ dạng chuỗi (tiền, số giờ, tên trạng thái); null khi không có",
+                        "description": "Giá trị cũ dạng chuỗi (tiền, số giờ, tên trạng thái); null khi không có (MODE_PRICE: null = không hỗ trợ)",
                         "example": "25000"
                     },
                     "newValue": {
@@ -9986,6 +10048,28 @@
                     }
                 }
             },
+            "PublicWashModeResponse": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "completionHours": {
+                        "type": "integer",
+                        "format": "int32"
+                    },
+                    "isDefault": {
+                        "type": "boolean"
+                    }
+                }
+            },
             "PublicStoreResponse": {
                 "type": "object",
                 "description": "Thông tin cửa hàng công khai cho trang chủ (không đăng nhập)",
@@ -10032,6 +10116,18 @@
                     }
                 }
             },
+            "ModePrice": {
+                "type": "object",
+                "properties": {
+                    "washModeId": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "price": {
+                        "type": "number"
+                    }
+                }
+            },
             "PublicServiceResponse": {
                 "type": "object",
                 "description": "Dịch vụ đang hoạt động trên bảng giá công khai, không có dữ liệu audit",
@@ -10052,34 +10148,17 @@
                             "PRODUCT"
                         ]
                     },
-                    "price": {
-                        "type": "number"
-                    },
                     "minQuantity": {
                         "type": "number"
                     },
-                    "standardHours": {
-                        "type": "integer",
-                        "format": "int32"
-                    },
-                    "expressSupported": {
-                        "type": "boolean"
-                    },
-                    "expressSurcharge": {
-                        "type": [
-                            "number",
-                            "null"
-                        ]
-                    },
-                    "expressHours": {
-                        "type": [
-                            "integer",
-                            "null"
-                        ],
-                        "format": "int32"
-                    },
                     "whitesApplicable": {
                         "type": "boolean"
+                    },
+                    "prices": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ModePrice"
+                        }
                     }
                 }
             },
@@ -10114,14 +10193,6 @@
                     "minLeadHours": {
                         "type": "integer",
                         "format": "int32"
-                    },
-                    "returnGapHoursNormal": {
-                        "type": "integer",
-                        "format": "int32"
-                    },
-                    "returnGapHoursExpress": {
-                        "type": "integer",
-                        "format": "int32"
                     }
                 }
             },
@@ -10142,19 +10213,6 @@
                     "customerPhone": {
                         "type": "string"
                     },
-                    "serviceType": {
-                        "type": "string",
-                        "enum": [
-                            "WASH_DRY",
-                            "DRY_CLEAN",
-                            "IRON_ONLY",
-                            "EXPRESS",
-                            "SPECIAL"
-                        ]
-                    },
-                    "serviceName": {
-                        "type": "string"
-                    },
                     "totalWeight": {
                         "type": "number"
                     },
@@ -10172,12 +10230,12 @@
                             "URGENT"
                         ]
                     },
-                    "orderType": {
-                        "type": "string",
-                        "enum": [
-                            "NORMAL",
-                            "EXPRESS"
-                        ]
+                    "washModeId": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "washModeName": {
+                        "type": "string"
                     },
                     "status": {
                         "type": "string",
@@ -10367,19 +10425,6 @@
                     "customerPhone": {
                         "type": "string"
                     },
-                    "serviceType": {
-                        "type": "string",
-                        "enum": [
-                            "WASH_DRY",
-                            "DRY_CLEAN",
-                            "IRON_ONLY",
-                            "EXPRESS",
-                            "SPECIAL"
-                        ]
-                    },
-                    "serviceName": {
-                        "type": "string"
-                    },
                     "totalWeight": {
                         "type": "number"
                     },
@@ -10400,12 +10445,12 @@
                             "URGENT"
                         ]
                     },
-                    "orderType": {
-                        "type": "string",
-                        "enum": [
-                            "NORMAL",
-                            "EXPRESS"
-                        ]
+                    "washModeId": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "washModeName": {
+                        "type": "string"
                     },
                     "paymentStatus": {
                         "type": "string",
@@ -10496,6 +10541,19 @@
                     }
                 }
             },
+            "ModeCount": {
+                "type": "object",
+                "properties": {
+                    "washModeId": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "count": {
+                        "type": "integer",
+                        "format": "int64"
+                    }
+                }
+            },
             "WorkCountsResponse": {
                 "type": "object",
                 "description": "Số đơn Mới nhận + Đang xử lý theo tab của Danh sách công việc; các tab chồng nhau",
@@ -10525,10 +10583,12 @@
                         "format": "int64",
                         "description": "Đã quá giờ hẹn trả"
                     },
-                    "express": {
-                        "type": "integer",
-                        "format": "int64",
-                        "description": "Giặt nhanh"
+                    "byMode": {
+                        "type": "array",
+                        "description": "Số đơn đang mở theo hình thức giặt",
+                        "items": {
+                            "$ref": "#/components/schemas/ModeCount"
+                        }
                     },
                     "pendingConfirmation": {
                         "type": "integer",
@@ -11246,12 +11306,12 @@
                             "OFFLINE"
                         ]
                     },
-                    "orderType": {
-                        "type": "string",
-                        "enum": [
-                            "NORMAL",
-                            "EXPRESS"
-                        ]
+                    "washModeId": {
+                        "type": "integer",
+                        "format": "int64"
+                    },
+                    "washModeName": {
+                        "type": "string"
                     },
                     "fulfillment": {
                         "$ref": "#/components/schemas/Fulfillment"
@@ -11348,17 +11408,6 @@
                         "type": "boolean"
                     },
                     "empty": {
-                        "type": "boolean"
-                    }
-                }
-            },
-            "ServiceLine": {
-                "type": "object",
-                "properties": {
-                    "serviceName": {
-                        "type": "string"
-                    },
-                    "extra": {
                         "type": "boolean"
                     }
                 }

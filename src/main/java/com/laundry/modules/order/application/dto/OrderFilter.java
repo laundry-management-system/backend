@@ -4,7 +4,6 @@ import com.laundry.common.exception.BusinessException;
 import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.order.domain.OrderPriority;
 import com.laundry.modules.order.domain.OrderStatus;
-import com.laundry.modules.order.domain.OrderType;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -20,7 +19,7 @@ public record OrderFilter(
         String phone,
         String search,
         String intakeCode,
-        OrderType orderType,
+        Long washModeId,
         Boolean classified,
         Boolean late,
         Instant dueStart,
@@ -31,7 +30,7 @@ public record OrderFilter(
 
     public static OrderFilter of(OrderStatus status, List<OrderStatus> statuses, OrderChannel channel,
                                  OrderPriority priority,
-                                 String phone, String search, String intakeCode, OrderType orderType,
+                                 String phone, String search, String intakeCode, Long washModeId,
                                  Boolean classified, Boolean late, String dueFrom, String dueTo) {
         LocalDate from = parseDate(dueFrom, "dueFrom");
         LocalDate to = parseDate(dueTo, "dueTo");
@@ -46,7 +45,7 @@ public record OrderFilter(
                 clean(phone),
                 clean(search),
                 clean(intakeCode),
-                orderType,
+                washModeId,
                 classified,
                 late,
                 from == null ? null : from.atStartOfDay(ZONE).toInstant(),

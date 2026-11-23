@@ -9,7 +9,6 @@ import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.order.domain.OrderFulfillment;
 import com.laundry.modules.order.domain.OrderStatus;
 import com.laundry.modules.order.domain.OrderStatusHistory;
-import com.laundry.modules.order.domain.OrderType;
 import com.laundry.modules.order.domain.PaymentStatus;
 import com.laundry.modules.order.domain.ReturnMethod;
 import com.laundry.modules.order.domain.ReturnStatus;
@@ -28,7 +27,8 @@ import java.util.regex.Pattern;
  * lý do lịch sử, ghi chú nội bộ, ghi chú tình trạng tự do, ghi chú ảnh hay chi tiết sự cố.
  */
 public record CustomerOrderDetailResponse(
-        String orderCode, OrderChannel channel, OrderType orderType, OrderStatus status,
+        String orderCode, OrderChannel channel, Long washModeId, String washModeName,
+        OrderStatus status,
         PaymentStatus paymentStatus, boolean classified, String customerRejectReason,
         Milestones milestones, Instant dueAt, Fulfillment fulfillment,
         List<RequestedService> requestedServices, boolean washWhitesSeparately, List<Item> items, Money money,
@@ -83,7 +83,7 @@ public record CustomerOrderDetailResponse(
         BigDecimal whitesFee = classified && order.getWhitesFee() != null ? order.getWhitesFee() : BigDecimal.ZERO;
         Money money = new Money(order.getSubtotal(), order.getExpressFee(), whitesFee, order.getDiscountAmount(),
                 order.getVoucherCode(), order.getIncidentDiscount(), order.getTotalAmount(), order.payableAmount());
-        return new CustomerOrderDetailResponse(order.getOrderCode(), order.getChannel(), order.getOrderType(),
+        return new CustomerOrderDetailResponse(order.getOrderCode(), order.getChannel(), order.getWashModeId(), order.getWashModeName(),
                 order.getStatus(), order.getPaymentStatus(), classified,
                 f == null ? null : f.getCustomerRejectReason(), milestones, order.getDueAt(), fulfillment,
                 requested, Boolean.TRUE.equals(order.getWashWhitesSeparately()), items, money,
