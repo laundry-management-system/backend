@@ -1,10 +1,12 @@
 package com.laundry.common.exception;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
@@ -20,6 +22,17 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private static final String BOOKING_PATH = "/api/customer-portal/bookings";
+
+    /** Câu 401: đường đặt đơn có câu riêng cho khách (R3), còn lại giữ câu chung. */
+    public static String unauthorizedDetail(String uri) {
+        return isBookingPath(uri) ? "Vui lòng đăng nhập để đặt đơn" : "Chưa đăng nhập hoặc token không hợp lệ";
+    }
+
+    public static boolean isBookingPath(String uri) {
+        return uri != null && (uri.equals(BOOKING_PATH) || uri.startsWith(BOOKING_PATH + "/"));
+    }
+
     @ExceptionHandler(NotFoundException.class)
     public ProblemDetail handleNotFound(NotFoundException ex) {
         return problem(HttpStatus.NOT_FOUND, ex.getMessage());
@@ -28,8 +41,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ProblemDetail handleBusiness(BusinessException ex) {
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, ex.getMessage());
-        if (ex.getField() != null) pd.setProperty("errors", Map.of(ex.getField(), ex.getMessage()));
+        if (ex.getErrors() != null && !ex.getErrors().isEmpty()) pd.setProperty("errors", ex.getErrors());
+        else if (ex.getField() != null) pd.setProperty("errors", Map.of(ex.getField(), ex.getMessage()));
         return pd;
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleUnreadable(HttpMessageNotReadableException ex) {
+        return problem(HttpStatus.BAD_REQUEST, "Dữ liệu không hợp lệ");
     }
 
     @ExceptionHandler(ResourceConflictException.class)
@@ -56,7 +75,9 @@ public class GlobalExceptionHandler {
     // Tham số query / path sai kiểu (enum lạ, chữ ở chỗ số) là lỗi của người gọi, không phải lỗi hệ thống
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
-        String message = "Giá trị không hợp lệ cho tham số " + ex.getName();
+        String message = "channel".equals(ex.getName())
+                ? "Kênh không hợp lệ"
+                : "Giá trị không hợp lệ cho tham số " + ex.getName();
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, message);
         pd.setProperty("errors", Map.of(ex.getName(), message));
         return pd;
@@ -76,8 +97,8 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(AuthenticationException.class)
-    public ProblemDetail handleAuthentication(AuthenticationException ex) {
-        return problem(HttpStatus.UNAUTHORIZED, "Chưa đăng nhập hoặc token không hợp lệ");
+    public ProblemDetail handleAuthentication(AuthenticationException ex, HttpServletRequest request) {
+        return problem(HttpStatus.UNAUTHORIZED, unauthorizedDetail(request.getRequestURI()));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

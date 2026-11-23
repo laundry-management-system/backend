@@ -1,8 +1,10 @@
 package com.laundry.modules.report.domain;
 
+import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.order.domain.OrderStatus;
 import com.laundry.modules.payments.domain.PaymentStatus;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -22,7 +24,9 @@ public class ReportQueryRepository {
 
     private final EntityManager entityManager;
 
-    public record RevenueRecord(String period, String method, BigDecimal total, long paymentCount) {}
+    public record RevenueRecord(String period, String method, String channel, BigDecimal total, long paymentCount) {}
+
+    public record ChannelOrderTotals(String channel, long orders, BigDecimal revenue) {}
 
     public record OrderStatusCount(String status, long count) {}
 
@@ -35,24 +39,35 @@ public class ReportQueryRepository {
 
     public record DashboardOrderCounts(long received, long cancelled, long delivered,
                                        long waiting, long processing, long readyForPickup,
-                                       long lateOrders, long storedOrders) {}
+                                       long lateOrders, long storedOrders,
+                                       long pendingConfirmation, long awaitingDropoff) {}
 
     public record RevenuePaymentRecord(Long paymentId, Instant paidAt, String method, BigDecimal amount,
-                                       String invoiceNo, Long orderId, String orderCode, String customerName) {}
+                                       String invoiceNo, Long orderId, String orderCode, String customerName,
+                                       String channel) {}
 
-    /** Doanh thu theo kỳ và phương thức: chỉ giao dịch CONFIRMED, tính theo paid_at (BR-J04), nhóm theo giờ VN. */
+    /** Đơn không vào số đơn / số liệu dịch vụ (FR-027): chưa nhận đồ hoặc đã hủy. */
+    private static final List<String> NOT_COUNTED = List.of(OrderStatus.PENDING_CONFIRMATION.name(),
+            OrderStatus.AWAITING_DROPOFF.name(), OrderStatus.CANCELLED.name());
+
+    /**
+     * Doanh thu theo kỳ, phương thức và kênh của đơn: chỉ giao dịch CONFIRMED, tính theo paid_at (BR-J04),
+     * nhóm theo giờ VN. Không lọc kênh ở đây để service vừa lọc vừa tách đủ hai kênh.
+     */
     public List<RevenueRecord> sumPaymentsByPeriodAndMethod(Instant from, Instant to, Granularity granularity) {
         // Mẫu to_char (YYYY-MM-DD hoặc YYYY-MM) truyền bằng tham số, không nối chuỗi vào câu SQL
         String sql = """
                 SELECT to_char(p.paid_at AT TIME ZONE 'Asia/Ho_Chi_Minh', :pattern) AS period,
                        p.method AS method,
+                       o.channel AS channel,
                        COALESCE(SUM(p.amount), 0) AS total,
                        COUNT(*) AS payment_count
                 FROM payments p
+                JOIN orders o ON o.id = p.order_id
                 WHERE p.status = :confirmed
                   AND p.paid_at >= :fromTs AND p.paid_at < :toTs
-                GROUP BY 1, 2
-                ORDER BY 1, 2
+                GROUP BY 1, 2, 3
+                ORDER BY 1, 2, 3
                 """;
 
         List<?> rows = entityManager.createNativeQuery(sql)
@@ -65,24 +80,27 @@ public class ReportQueryRepository {
         List<RevenueRecord> result = new ArrayList<>(rows.size());
         for (Object row : rows) {
             Object[] r = (Object[]) row;
-            result.add(new RevenueRecord((String) r[0], (String) r[1], toMoney(r[2]), toLong(r[3])));
+            result.add(new RevenueRecord((String) r[0], (String) r[1], (String) r[2], toMoney(r[3]), toLong(r[4])));
         }
         return result;
     }
 
-    /** Số đơn nhận theo ngày/tháng (giờ VN), gồm cả đơn đã hủy để khớp tổng số đơn. */
-    public List<OrderPeriodCount> countOrdersByPeriod(Instant from, Instant to, Granularity granularity) {
+    /** Số đơn nhận theo ngày/tháng (giờ VN, theo received_at), không tính đơn hủy / chưa nhận đồ (FR-027). */
+    public List<OrderPeriodCount> countOrdersByPeriod(Instant from, Instant to, Granularity granularity,
+                                                      OrderChannel channel) {
         String sql = """
                 SELECT to_char(o.received_at AT TIME ZONE 'Asia/Ho_Chi_Minh', :pattern) AS period,
                        COUNT(*) AS cnt
                 FROM orders o
-                WHERE o.received_at >= :fromTs AND o.received_at < :toTs
+                WHERE o.status NOT IN (:notCounted)
+                  AND o.received_at >= :fromTs AND o.received_at < :toTs %s
                 GROUP BY 1
                 ORDER BY 1
-                """;
+                """.formatted(channelClause(channel));
 
-        List<?> rows = entityManager.createNativeQuery(sql)
+        List<?> rows = withChannel(entityManager.createNativeQuery(sql), channel)
                 .setParameter("pattern", granularity.getSqlPattern())
+                .setParameter("notCounted", NOT_COUNTED)
                 .setParameter("fromTs", from)
                 .setParameter("toTs", to)
                 .getResultList();
@@ -95,16 +113,18 @@ public class ReportQueryRepository {
         return result;
     }
 
-    /** Số đơn nhận trong kỳ theo trạng thái (gồm cả đơn đã hủy). */
-    public List<OrderStatusCount> countOrdersByStatus(Instant from, Instant to) {
+    /** Số đơn nhận trong kỳ theo trạng thái (gồm cả đơn đã hủy, không gồm đơn chưa nhận đồ). */
+    public List<OrderStatusCount> countOrdersByStatus(Instant from, Instant to, OrderChannel channel) {
         String sql = """
                 SELECT o.status AS status, COUNT(*) AS cnt
                 FROM orders o
-                WHERE o.received_at >= :fromTs AND o.received_at < :toTs
+                WHERE o.status NOT IN (:beforeDropoff)
+                  AND o.received_at >= :fromTs AND o.received_at < :toTs %s
                 GROUP BY o.status
-                """;
+                """.formatted(channelClause(channel));
 
-        List<?> rows = entityManager.createNativeQuery(sql)
+        List<?> rows = withChannel(entityManager.createNativeQuery(sql), channel)
+                .setParameter("beforeDropoff", NOT_COUNTED.subList(0, 2))
                 .setParameter("fromTs", from)
                 .setParameter("toTs", to)
                 .getResultList();
@@ -121,18 +141,18 @@ public class ReportQueryRepository {
      * Số đơn trễ và tổng tiền của các đơn không hủy nhận trong kỳ.
      * Trễ: thời điểm hoàn thành (chưa có thì lúc giao, chưa có nữa thì hiện tại) vượt due_at.
      */
-    public ActiveOrderTotals findActiveOrderTotals(Instant from, Instant to) {
+    public ActiveOrderTotals findActiveOrderTotals(Instant from, Instant to, OrderChannel channel) {
         String sql = """
                 SELECT COALESCE(SUM(CASE WHEN COALESCE(o.completed_at, o.delivered_at, now()) > o.due_at
                                          THEN 1 ELSE 0 END), 0) AS late_orders,
                        COALESCE(SUM(o.total_amount), 0) AS total_amount
                 FROM orders o
-                WHERE o.status <> :cancelled
-                  AND o.received_at >= :fromTs AND o.received_at < :toTs
-                """;
+                WHERE o.status NOT IN (:notCounted)
+                  AND o.received_at >= :fromTs AND o.received_at < :toTs %s
+                """.formatted(channelClause(channel));
 
-        Object[] r = (Object[]) entityManager.createNativeQuery(sql)
-                .setParameter("cancelled", OrderStatus.CANCELLED.name())
+        Object[] r = (Object[]) withChannel(entityManager.createNativeQuery(sql), channel)
+                .setParameter("notCounted", NOT_COUNTED)
                 .setParameter("fromTs", from)
                 .setParameter("toTs", to)
                 .getSingleResult();
@@ -141,7 +161,7 @@ public class ReportQueryRepository {
     }
 
     /** Doanh thu theo dịch vụ từ các dòng đơn của đơn không hủy; dòng không gắn dịch vụ gom thành "Khác". */
-    public List<ServiceRevenueRecord> sumRevenueByService(Instant from, Instant to) {
+    public List<ServiceRevenueRecord> sumRevenueByService(Instant from, Instant to, OrderChannel channel) {
         String sql = """
                 SELECT s.id AS service_id,
                        s.service_code AS service_code,
@@ -153,14 +173,14 @@ public class ReportQueryRepository {
                 FROM orders o
                 JOIN order_items oi ON oi.order_id = o.id
                 LEFT JOIN services s ON s.id = oi.service_id
-                WHERE o.status <> :cancelled
-                  AND o.received_at >= :fromTs AND o.received_at < :toTs
+                WHERE o.status NOT IN (:notCounted)
+                  AND o.received_at >= :fromTs AND o.received_at < :toTs %s
                 GROUP BY s.id, s.service_code, s.name, s.unit
                 ORDER BY revenue DESC, service_name
-                """;
+                """.formatted(channelClause(channel));
 
-        List<?> rows = entityManager.createNativeQuery(sql)
-                .setParameter("cancelled", OrderStatus.CANCELLED.name())
+        List<?> rows = withChannel(entityManager.createNativeQuery(sql), channel)
+                .setParameter("notCounted", NOT_COUNTED)
                 .setParameter("fromTs", from)
                 .setParameter("toTs", to)
                 .getResultList();
@@ -195,7 +215,9 @@ public class ReportQueryRepository {
                        COUNT(*) FILTER (WHERE o.status = :processing) AS processing,
                        COUNT(*) FILTER (WHERE o.status = :completed) AS ready_for_pickup,
                        COUNT(*) FILTER (WHERE o.status IN (:received, :processing) AND o.due_at < now()) AS late_orders,
-                       COUNT(*) FILTER (WHERE o.status = :completed AND o.completed_at < :storedBefore) AS stored_orders
+                       COUNT(*) FILTER (WHERE o.status = :completed AND o.completed_at < :storedBefore) AS stored_orders,
+                       COUNT(*) FILTER (WHERE o.status = :pendingConfirmation) AS pending_confirmation,
+                       COUNT(*) FILTER (WHERE o.status = :awaitingDropoff) AS awaiting_dropoff
                 FROM orders o
                 WHERE o.status NOT IN (:delivered, :cancelled)
                    OR o.received_at >= :fromTs
@@ -211,27 +233,31 @@ public class ReportQueryRepository {
                 .setParameter("completed", OrderStatus.COMPLETED.name())
                 .setParameter("delivered", OrderStatus.DELIVERED.name())
                 .setParameter("cancelled", OrderStatus.CANCELLED.name())
+                .setParameter("pendingConfirmation", OrderStatus.PENDING_CONFIRMATION.name())
+                .setParameter("awaitingDropoff", OrderStatus.AWAITING_DROPOFF.name())
                 .getSingleResult();
 
         return new DashboardOrderCounts(toLong(r[0]), toLong(r[1]), toLong(r[2]), toLong(r[3]),
-                toLong(r[4]), toLong(r[5]), toLong(r[6]), toLong(r[7]));
+                toLong(r[4]), toLong(r[5]), toLong(r[6]), toLong(r[7]),
+                toLong(r[8]), toLong(r[9]));
     }
 
     /**
      * Từng giao dịch tạo nên doanh thu trong [from, to): cùng điều kiện với {@link #sumPaymentsByPeriodAndMethod}
      * để tổng luôn khớp báo cáo. Mới nhất trước.
      */
-    public List<RevenuePaymentRecord> findRevenuePayments(Instant from, Instant to, int limit) {
+    public List<RevenuePaymentRecord> findRevenuePayments(Instant from, Instant to, OrderChannel channel, int limit) {
         String sql = """
-                SELECT p.id, p.paid_at, p.method, p.amount, p.invoice_no, o.id, o.order_code, o.customer_name
+                SELECT p.id, p.paid_at, p.method, p.amount, p.invoice_no, o.id, o.order_code, o.customer_name,
+                       o.channel
                 FROM payments p
                 JOIN orders o ON o.id = p.order_id
                 WHERE p.status = :confirmed
-                  AND p.paid_at >= :fromTs AND p.paid_at < :toTs
+                  AND p.paid_at >= :fromTs AND p.paid_at < :toTs %s
                 ORDER BY p.paid_at DESC
-                """;
+                """.formatted(channelClause(channel));
 
-        List<?> rows = entityManager.createNativeQuery(sql)
+        List<?> rows = withChannel(entityManager.createNativeQuery(sql), channel)
                 .setParameter("confirmed", PaymentStatus.CONFIRMED.name())
                 .setParameter("fromTs", from)
                 .setParameter("toTs", to)
@@ -243,9 +269,52 @@ public class ReportQueryRepository {
             Object[] r = (Object[]) row;
             result.add(new RevenuePaymentRecord(
                     ((Number) r[0]).longValue(), toInstant(r[1]), (String) r[2], toMoney(r[3]),
-                    (String) r[4], ((Number) r[5]).longValue(), (String) r[6], (String) r[7]));
+                    (String) r[4], ((Number) r[5]).longValue(), (String) r[6], (String) r[7], (String) r[8]));
         }
         return result;
+    }
+
+    /**
+     * Số đơn và tiền thực thu (payments CONFIRMED) theo kênh của các đơn nhận trong kỳ (received_at),
+     * không tính đơn hủy / chưa nhận đồ. Không lọc kênh: báo cáo luôn tách đủ hai kênh.
+     */
+    public List<ChannelOrderTotals> sumOrdersByChannel(Instant from, Instant to) {
+        String sql = """
+                SELECT o.channel AS channel,
+                       COUNT(*) AS orders,
+                       COALESCE(SUM(pay.amount), 0) AS revenue
+                FROM orders o
+                LEFT JOIN (SELECT p.order_id, SUM(p.amount) AS amount
+                           FROM payments p
+                           WHERE p.status = :confirmed
+                           GROUP BY p.order_id) pay ON pay.order_id = o.id
+                WHERE o.status NOT IN (:notCounted)
+                  AND o.received_at >= :fromTs AND o.received_at < :toTs
+                GROUP BY o.channel
+                """;
+
+        List<?> rows = entityManager.createNativeQuery(sql)
+                .setParameter("confirmed", PaymentStatus.CONFIRMED.name())
+                .setParameter("notCounted", NOT_COUNTED)
+                .setParameter("fromTs", from)
+                .setParameter("toTs", to)
+                .getResultList();
+
+        List<ChannelOrderTotals> result = new ArrayList<>(rows.size());
+        for (Object row : rows) {
+            Object[] r = (Object[]) row;
+            result.add(new ChannelOrderTotals((String) r[0], toLong(r[1]), toMoney(r[2])));
+        }
+        return result;
+    }
+
+    // Mệnh đề cố định, giá trị kênh vẫn truyền bằng tham số
+    private static String channelClause(OrderChannel channel) {
+        return channel == null ? "" : "AND o.channel = :channel";
+    }
+
+    private static Query withChannel(Query query, OrderChannel channel) {
+        return channel == null ? query : query.setParameter("channel", channel.name());
     }
 
     private static Instant toInstant(Object value) {

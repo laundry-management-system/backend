@@ -69,8 +69,18 @@ VALUES
 
     ('WHITES_FEE', '80000', 'Phụ phí giặt riêng đồ trắng (đ/đơn)', NULL, NOW()),
 
-    ('SHIFT_WARN_HOURS', '14', 'Cảnh báo ca mở quá số giờ này mà chưa kết', NULL, NOW())
+    ('SHIFT_WARN_HOURS', '14', 'Cảnh báo ca mở quá số giờ này mà chưa kết', NULL, NOW()),
+
+    ('BOOKING_ENABLED', 'true', 'Nhận đặt đơn online (true: bật, false: tạm ngừng)', NULL, NOW()),
+    ('BOOKING_DELIVERY_ENABLED', 'true', 'Nhận lấy và giao tận nơi cho đơn đặt online (true: bật, false: tắt)', NULL, NOW()),
+    ('BOOKING_MIN_LEAD_HOURS', '1', 'Số giờ đặt trước tối thiểu so với giờ hẹn của yêu cầu đặt đơn', NULL, NOW()),
+    ('BOOKING_MAX_OPEN_PER_CUSTOMER', '10', 'Số yêu cầu đặt đơn chưa đóng tối đa của mỗi khách', NULL, NOW()),
+    ('BOOKING_PICKUP_MIN_AMOUNT', '100000', 'Tiền hàng tạm tính tối thiểu để được lấy tận nơi (đ)', NULL, NOW()),
+    ('BOOKING_RETURN_GAP_HOURS_NORMAL', '24', 'Thời gian giặt tiêu chuẩn', NULL, NOW()),
+    ('BOOKING_RETURN_GAP_HOURS_EXPRESS', '6', 'Thời gian giặt nhanh', NULL, NOW())
 ON CONFLICT (setting_key) DO NOTHING;
+
+UPDATE settings SET setting_value='10' WHERE setting_key='BOOKING_MAX_OPEN_PER_CUSTOMER' AND setting_value='2' AND updated_by IS NULL;
 
 -- Tối đa một ca đang mở (BR-K01); Hibernate ddl-auto không tạo được index một phần
 CREATE UNIQUE INDEX IF NOT EXISTS uk_shifts_one_open ON shifts ((true)) WHERE status = 'OPEN';
@@ -91,3 +101,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_customer_registrations_pending_email ON cus
 -- Yêu cầu chờ tạo trước khi hồ sơ được gắn lúc đăng ký: gắn vào hồ sơ cùng SĐT
 UPDATE customer_registrations r SET customer_id = c.id FROM customers c
     WHERE r.status = 'PENDING' AND r.customer_id IS NULL AND c.phone = r.phone;
+
+-- 029: đơn online (enum mở rộng, received_at NULL tới khi nhận đồ)
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+ALTER TABLE order_status_history DROP CONSTRAINT IF EXISTS order_status_history_action_type_check;
+ALTER TABLE orders ALTER COLUMN received_at DROP NOT NULL;

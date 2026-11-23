@@ -1,5 +1,6 @@
 package com.laundry.modules.report.application.dto;
 
+import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.report.domain.Granularity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
@@ -35,6 +36,12 @@ public record RevenueReportResponse(
             @Schema(description = "Doanh thu chuyển khoản")
             BigDecimal bankTransfer,
 
+            @Schema(description = "Doanh thu đơn online")
+            BigDecimal online,
+
+            @Schema(description = "Doanh thu đơn tại quầy")
+            BigDecimal offline,
+
             @Schema(description = "Tổng doanh thu của kỳ")
             BigDecimal total,
 
@@ -53,6 +60,12 @@ public record RevenueReportResponse(
             long cashCount,
 
             @Schema(description = "Số giao dịch chuyển khoản")
-            long bankTransferCount
+            long bankTransferCount,
+
+            @Schema(description = "Tiền thực thu theo kênh của đơn, luôn đủ ONLINE và OFFLINE, bỏ qua bộ lọc kênh")
+            List<ChannelRevenue> byChannel
     ) {}
+
+    @Schema(description = "Doanh thu của một kênh")
+    public record ChannelRevenue(OrderChannel channel, BigDecimal total, long paymentCount) {}
 }

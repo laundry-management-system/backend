@@ -2,6 +2,7 @@ package com.laundry.modules.setting.application;
 
 import com.laundry.modules.service.application.LaundryServiceService;
 import com.laundry.modules.service.application.dto.ServiceResponse;
+import com.laundry.modules.setting.application.dto.PublicBookingSettingsResponse;
 import com.laundry.modules.setting.application.dto.PublicServiceAreaResponse;
 import com.laundry.modules.setting.application.dto.PublicServiceResponse;
 import com.laundry.modules.setting.application.dto.PublicStoreResponse;
@@ -30,7 +31,7 @@ public class PublicSiteService {
     // Không khoá: hai luồng có thể cùng nạp lại khi hết hạn, chấp nhận được vì dữ liệu chỉ đọc
     private volatile Snapshot snapshot;
 
-    private record Snapshot(PublicStoreResponse store, List<PublicServiceResponse> services, List<PublicServiceAreaResponse> areas, Instant loadedAt) {}
+    private record Snapshot(PublicStoreResponse store, List<PublicServiceResponse> services, List<PublicServiceAreaResponse> areas, PublicBookingSettingsResponse bookingSettings, Instant loadedAt) {}
 
     public PublicStoreResponse getStore() {
         return current().store();
@@ -42,6 +43,10 @@ public class PublicSiteService {
 
     public List<PublicServiceAreaResponse> getServiceAreas() {
         return current().areas();
+    }
+
+    public PublicBookingSettingsResponse getBookingSettings() {
+        return current().bookingSettings();
     }
 
     private Snapshot current() {
@@ -76,6 +81,13 @@ public class PublicSiteService {
                 .map(PublicServiceAreaResponse::from)
                 .toList();
 
-        return new Snapshot(store, services, areas, Instant.now());
+        PublicBookingSettingsResponse booking = new PublicBookingSettingsResponse(
+                settingService.getValue(SettingKey.BOOKING_ENABLED, Boolean.class),
+                settingService.getValue(SettingKey.BOOKING_DELIVERY_ENABLED, Boolean.class),
+                settingService.getValue(SettingKey.BOOKING_MIN_LEAD_HOURS, Integer.class),
+                settingService.getValue(SettingKey.BOOKING_RETURN_GAP_HOURS_NORMAL, Integer.class),
+                settingService.getValue(SettingKey.BOOKING_RETURN_GAP_HOURS_EXPRESS, Integer.class));
+
+        return new Snapshot(store, services, areas, booking, Instant.now());
     }
 }

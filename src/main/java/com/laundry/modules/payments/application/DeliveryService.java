@@ -23,6 +23,9 @@ public class DeliveryService {
     @Transactional
     public DeliveryResponse deliver(String orderCode, DeliveryRequest request, String username) {
         OrderSnapshot order = orderIntegration.lockByCode(orderCode);
+        if ("PENDING_CONFIRMATION".equals(order.status()) || "AWAITING_DROPOFF".equals(order.status())) {
+            throw new BusinessException("Đơn online chưa nhận đồ, chưa thể thực hiện thao tác này");
+        }
         if (!"COMPLETED".equals(order.status())) {
             throw new BusinessException("Chỉ giao được đơn đã hoàn thành");
         }
@@ -43,7 +46,7 @@ public class DeliveryService {
                 .findFirst()
                 .orElse(null);
         // Voucher giảm hết tiền: đơn tự PAID mà không có giao dịch (giao dịch phải > 0)
-        boolean nothingToPay = order.totalAmount() != null && order.totalAmount().signum() <= 0;
+        boolean nothingToPay = order.payableAmount() != null && order.payableAmount().signum() <= 0;
         if (confirmedPayment == null && !nothingToPay) {
             throw new BusinessException("Đơn đang ở trạng thái đã thanh toán nhưng thiếu giao dịch");
         }
@@ -51,7 +54,7 @@ public class DeliveryService {
         orderIntegration.deliver(order.id(), deliveredAt, username, receiverName, receiverRelation);
 
         return new DeliveryResponse(order.orderCode(), order.customerName(), order.customerPhone(), order.dueAt(),
-                order.totalAmount(),
+                order.payableAmount(),
                 confirmedPayment != null ? confirmedPayment.getInvoiceNo() : null,
                 confirmedPayment != null ? confirmedPayment.getMethod() : null,
                 confirmedPayment != null ? confirmedPayment.getPaidAt() : null,

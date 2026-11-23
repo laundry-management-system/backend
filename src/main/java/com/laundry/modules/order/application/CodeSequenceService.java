@@ -43,12 +43,9 @@ public class CodeSequenceService {
     }
 
     private int nextNumber(String seqType, LocalDate date) {
+        codeSequenceRepository.insertIfAbsent(seqType, date);
         CodeSequence sequence = codeSequenceRepository.findBySeqTypeAndSeqDateForUpdate(seqType, date)
-                .orElseGet(() -> CodeSequence.builder()
-                        .seqType(seqType)
-                        .seqDate(date)
-                        .lastNumber(0)
-                        .build());
+                .orElseThrow();
         int nextNum = sequence.increment();
         codeSequenceRepository.save(sequence);
         return nextNum;

@@ -109,13 +109,13 @@ public class VoucherService {
     @Transactional(readOnly = true)
     public VoucherValidationResponse validateVoucher(String code, BigDecimal orderValue) {
         if (code == null || code.isBlank()) {
-            return VoucherValidationResponse.invalid("", "Voucher code must not be blank");
+            return VoucherValidationResponse.invalid("", "Vui lòng nhập mã voucher");
         }
         String cleanCode = code.trim().toUpperCase();
 
         Voucher voucher = voucherRepository.findByCodeIgnoreCase(cleanCode).orElse(null);
         if (voucher == null) {
-            return VoucherValidationResponse.invalid(cleanCode, "Voucher code '" + cleanCode + "' not found");
+            return VoucherValidationResponse.invalid(cleanCode, "Mã voucher không hợp lệ");
         }
 
         String reason = voucher.rejectionReason(orderValue, LocalDate.now(), true);
@@ -150,7 +150,7 @@ public class VoucherService {
     public AppliedVoucher applyToOrder(String code, BigDecimal orderValue, Long currentVoucherId) {
         String cleanCode = code.trim().toUpperCase();
         Voucher voucher = voucherRepository.lockByCode(cleanCode)
-                .orElseThrow(() -> new BusinessException("Voucher code '" + cleanCode + "' not found", "voucherCode"));
+                .orElseThrow(() -> new BusinessException("Mã voucher không hợp lệ", "voucherCode"));
         boolean alreadyHeld = voucher.getId().equals(currentVoucherId);
         String reason = voucher.rejectionReason(orderValue, LocalDate.now(), !alreadyHeld);
         if (reason != null) {

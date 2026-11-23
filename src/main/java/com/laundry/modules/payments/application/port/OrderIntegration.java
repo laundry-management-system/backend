@@ -8,6 +8,9 @@ public interface OrderIntegration {
 
     Optional<OrderSnapshot> findByCode(String orderCode);
 
+    /** ONLINE order whose return leg is DELIVERY. */
+    boolean isOnlineDelivery(Long orderId);
+
     OrderSnapshot lockByCode(String orderCode);
 
     void setPaymentStatus(long orderId, boolean paid);

@@ -26,11 +26,21 @@ public class JpaOrderIntegrationAdapter implements OrderIntegration {
 
     private static final String ORDER_SELECT = """
             SELECT o.id, o.order_code, o.customer_id, o.customer_name, BTRIM(o.customer_phone),
-                   o.received_at, o.due_at, o.total_amount, o.status, o.payment_status,
+                   o.received_at, o.due_at,
+                   o.total_amount + COALESCE((SELECT f.pickup_fee + f.delivery_fee FROM order_fulfillments f WHERE f.order_id = o.id), 0),
+                   o.status, o.payment_status,
                    o.completed_at, o.shelf_location, o.delivered_at, o.delivered_by,
                    o.receiver_name, o.receiver_relation, o.last_notified_at,
                    o.notify_count, o.note
               FROM orders o
+            """;
+
+    // Đơn online chỉ trả đồ khi chiều trả ở bước cuối: DELIVERING (giao tận nơi) / AWAITING_CUSTOMER_COLLECT (tại tiệm)
+    private static final String RETURN_NOT_READY = """
+            SELECT 1 FROM order_fulfillments f
+             WHERE f.order_id = orders.id
+               AND f.return_status IS DISTINCT FROM
+                   CASE f.return_method WHEN 'DELIVERY' THEN 'DELIVERING' ELSE 'AWAITING_CUSTOMER_COLLECT' END
             """;
 
     private final EntityManager entityManager;
@@ -41,6 +51,19 @@ public class JpaOrderIntegrationAdapter implements OrderIntegration {
         Query query = entityManager.createNativeQuery(ORDER_SELECT + " WHERE o.order_code = :orderCode");
         query.setParameter("orderCode", orderCode);
         return query.getResultList().stream().findFirst().map(row -> map((Object[]) row));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isOnlineDelivery(Long orderId) {
+        return Boolean.TRUE.equals(entityManager.createNativeQuery("""
+                        SELECT EXISTS (SELECT 1 FROM orders o
+                                         JOIN order_fulfillments f ON f.order_id = o.id
+                                        WHERE o.id = :orderId AND o.channel = 'ONLINE'
+                                          AND f.return_method = 'DELIVERY')
+                        """)
+                .setParameter("orderId", orderId)
+                .getSingleResult());
     }
 
     @Override
@@ -62,7 +85,7 @@ public class JpaOrderIntegrationAdapter implements OrderIntegration {
         int updated = entityManager.createNativeQuery("""
                         UPDATE orders
                            SET payment_status = :paymentStatus, updated_at = CURRENT_TIMESTAMP
-                         WHERE id = :orderId AND status <> 'CANCELLED'
+                         WHERE id = :orderId AND status NOT IN ('CANCELLED','PENDING_CONFIRMATION','AWAITING_DROPOFF')
                         """)
                 .setParameter("paymentStatus", paid ? "PAID" : "UNPAID")
                 .setParameter("orderId", orderId)
@@ -82,6 +105,8 @@ public class JpaOrderIntegrationAdapter implements OrderIntegration {
                                receiver_name = :receiverName, receiver_relation = :receiverRelation,
                                updated_at = CURRENT_TIMESTAMP
                          WHERE id = :orderId AND status = 'COMPLETED' AND payment_status = 'PAID'
+                           AND NOT EXISTS (""" + RETURN_NOT_READY + """
+                               )
                         """)
                 .setParameter("deliveredAt", Timestamp.from(deliveredAt))
                 .setParameter("deliveredBy", deliveredBy)
@@ -90,8 +115,34 @@ public class JpaOrderIntegrationAdapter implements OrderIntegration {
                 .setParameter("orderId", orderId)
                 .executeUpdate();
         if (updated == 0) {
-            throw new BusinessException("Only completed, paid orders can be delivered");
+            boolean returnNotReady = !entityManager.createNativeQuery(
+                            RETURN_NOT_READY.replace("orders.id", ":orderId"))
+                    .setParameter("orderId", orderId)
+                    .getResultList().isEmpty();
+            throw new BusinessException(returnNotReady ? "Đơn giao tận nơi phải chuyển sang Đang giao trước"
+                    : "Only completed, paid orders can be delivered");
         }
+        // Đơn online: bước cuối chiều trả (đơn tại quầy không có dòng fulfillment nên không tác dụng)
+        entityManager.createNativeQuery("""
+                        INSERT INTO order_status_history
+                               (order_id, action_type, old_value, new_value, performed_by, created_at, updated_at)
+                        SELECT order_id, 'RETURN_STATUS_CHANGE', return_status,
+                               CASE return_method WHEN 'DELIVERY' THEN 'DELIVERED' ELSE 'CUSTOMER_COLLECTED' END,
+                               :performedBy, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                          FROM order_fulfillments
+                         WHERE order_id = :orderId
+                        """)
+                .setParameter("performedBy", deliveredBy != null ? deliveredBy : "SYSTEM")
+                .setParameter("orderId", orderId)
+                .executeUpdate();
+        entityManager.createNativeQuery("""
+                        UPDATE order_fulfillments
+                           SET return_status = CASE return_method WHEN 'DELIVERY' THEN 'DELIVERED' ELSE 'CUSTOMER_COLLECTED' END,
+                               updated_at = CURRENT_TIMESTAMP
+                         WHERE order_id = :orderId
+                        """)
+                .setParameter("orderId", orderId)
+                .executeUpdate();
     }
 
     @Override

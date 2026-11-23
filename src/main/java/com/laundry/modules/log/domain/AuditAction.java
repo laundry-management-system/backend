@@ -5,6 +5,9 @@ import lombok.Getter;
 @Getter
 public enum AuditAction {
     ACCOUNT_MANAGE,
+    ORDER_CONFIRM,
+    ORDER_REJECT,
+    ORDER_FULFILLMENT_UPDATE,
     ACCOUNT_LOCKED,
     CUSTOMER_PHONE_CHANGE,
     DUE_DATE_CHANGE(true),
@@ -24,7 +27,8 @@ public enum AuditAction {
     SHIFT_CLOSE_ON_BEHALF(true),
     SHIFT_APPROVE,
     SERVICE_AREA_MANAGE,
-    CUSTOMER_ACCOUNT;
+    CUSTOMER_ACCOUNT,
+    BOOKING_REQUEST;
 
     private final boolean reasonRequired;
 

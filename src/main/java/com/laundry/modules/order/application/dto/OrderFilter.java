@@ -1,6 +1,7 @@
 package com.laundry.modules.order.application.dto;
 
 import com.laundry.common.exception.BusinessException;
+import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.order.domain.OrderPriority;
 import com.laundry.modules.order.domain.OrderStatus;
 import com.laundry.modules.order.domain.OrderType;
@@ -14,6 +15,7 @@ import java.util.List;
 public record OrderFilter(
         OrderStatus status,
         List<OrderStatus> statuses,
+        OrderChannel channel,
         OrderPriority priority,
         String phone,
         String search,
@@ -27,7 +29,8 @@ public record OrderFilter(
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
-    public static OrderFilter of(OrderStatus status, List<OrderStatus> statuses, OrderPriority priority,
+    public static OrderFilter of(OrderStatus status, List<OrderStatus> statuses, OrderChannel channel,
+                                 OrderPriority priority,
                                  String phone, String search, String intakeCode, OrderType orderType,
                                  Boolean classified, Boolean late, String dueFrom, String dueTo) {
         LocalDate from = parseDate(dueFrom, "dueFrom");
@@ -38,6 +41,7 @@ public record OrderFilter(
         return new OrderFilter(
                 status,
                 statuses == null ? List.of() : List.copyOf(statuses),
+                channel,
                 priority,
                 clean(phone),
                 clean(search),

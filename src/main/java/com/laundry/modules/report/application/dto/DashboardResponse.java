@@ -40,7 +40,13 @@ public record DashboardResponse(
             long processing,
 
             @Schema(description = "Số đơn hiện đang ở trạng thái Hoàn thành, chờ khách đến lấy, không giới hạn trong ngày")
-            long readyForPickup
+            long readyForPickup,
+
+            @Schema(description = "Số đơn online hiện ở Chờ xác nhận")
+            long pendingConfirmation,
+
+            @Schema(description = "Số đơn online hiện ở Chờ nhận đồ")
+            long awaitingDropoff
     ) {}
 
     @Schema(description = "Cảnh báo cần xử lý")

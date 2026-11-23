@@ -100,19 +100,19 @@ public class Voucher extends BaseEntity {
      */
     public String rejectionReason(BigDecimal orderValue, LocalDate today, boolean needsFreeUse) {
         if (!isActive()) {
-            return "Voucher '" + code + "' is disabled (BR-G05)";
+            return "Mã voucher không hợp lệ";
         }
         if (today.isBefore(startDate)) {
-            return "Voucher '" + code + "' is not yet active (effective from " + startDate + ") (BR-G01)";
+            return "Mã voucher không hợp lệ";
         }
         if (today.isAfter(endDate)) {
-            return "Voucher '" + code + "' has expired on " + endDate + " (BR-G01)";
+            return "Mã voucher đã hết hạn";
         }
         if (needsFreeUse && !hasAvailableUses()) {
-            return "Voucher '" + code + "' has reached its usage limit (" + maxUses + ") (BR-G03)";
+            return "Mã voucher đã hết lượt sử dụng";
         }
         if (!satisfiesMinOrderValue(orderValue)) {
-            return "Order total (" + orderValue + ") does not meet the minimum requirement of " + minOrderValue + " (BR-G02)";
+            return "Đơn chưa đạt giá trị tối thiểu " + (minOrderValue != null ? minOrderValue : BigDecimal.ZERO).toPlainString() + " để dùng mã này";
         }
         return null;
     }
@@ -156,7 +156,7 @@ public class Voucher extends BaseEntity {
 
     public void incrementUsedCount() {
         if (!hasAvailableUses()) {
-            throw new BusinessException("Voucher '" + code + "' has reached its maximum usage limit (BR-G03)");
+            throw new BusinessException("Mã voucher đã hết lượt sử dụng");
         }
         this.usedCount++;
     }

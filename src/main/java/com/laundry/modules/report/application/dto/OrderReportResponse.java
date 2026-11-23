@@ -1,5 +1,6 @@
 package com.laundry.modules.report.application.dto;
 
+import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.report.domain.Granularity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
@@ -19,13 +20,13 @@ public record OrderReportResponse(
 
         Summary summary,
 
-        @Schema(description = "Số đơn theo từng trạng thái (đủ mọi trạng thái, không có thì 0)")
+        @Schema(description = "Số đơn theo từng trạng thái đã nhận đồ (gồm Đã hủy, không có thì 0)")
         List<StatusCount> byStatus,
 
         @Schema(description = "Doanh thu theo dịch vụ, sắp giảm dần theo doanh thu")
         List<ServiceRevenue> byService,
 
-        @Schema(description = "Số đơn nhận theo từng ngày/tháng (gồm đơn đã hủy), đã điền 0 cho mốc không có đơn")
+        @Schema(description = "Số đơn nhận theo từng ngày/tháng (không gồm đơn đã hủy), đã điền 0 cho mốc không có đơn")
         List<PeriodCount> rows
 ) {
 
@@ -58,8 +59,14 @@ public record OrderReportResponse(
             BigDecimal ordersTotalAmount,
 
             @Schema(description = "Tổng thành tiền các dòng dịch vụ (chưa gồm giảm giá, phụ phí cấp đơn)")
-            BigDecimal itemsRevenue
+            BigDecimal itemsRevenue,
+
+            @Schema(description = "Số đơn (không hủy) và tiền thực thu theo kênh, luôn đủ ONLINE và OFFLINE, bỏ qua bộ lọc kênh")
+            List<ChannelOrders> byChannel
     ) {}
+
+    @Schema(description = "Số đơn và tiền thực thu của một kênh")
+    public record ChannelOrders(OrderChannel channel, long orders, BigDecimal revenue) {}
 
     @Schema(description = "Số đơn của một trạng thái")
     public record StatusCount(

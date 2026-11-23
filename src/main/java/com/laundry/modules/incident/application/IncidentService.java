@@ -73,6 +73,9 @@ public class IncidentService {
         if (order.getStatus() == OrderStatus.CANCELLED) {
             throw new BusinessException("Không lập phiếu cho đơn đã hủy", "orderId");
         }
+        if (order.getStatus().isBeforeDropoff()) {
+            throw new BusinessException(Order.BEFORE_DROPOFF_MESSAGE, "orderId");
+        }
         Incident incident = Incident.builder()
                 .code(codeSequenceService.getNextIncidentCode())
                 .order(order)

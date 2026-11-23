@@ -1,6 +1,7 @@
 package com.laundry.modules.setting.presentation;
 
 import com.laundry.modules.setting.application.PublicSiteService;
+import com.laundry.modules.setting.application.dto.PublicBookingSettingsResponse;
 import com.laundry.modules.setting.application.dto.PublicServiceAreaResponse;
 import com.laundry.modules.setting.application.dto.PublicServiceResponse;
 import com.laundry.modules.setting.application.dto.PublicStoreResponse;
@@ -42,5 +43,11 @@ public class PublicSiteController {
     @GetMapping("/service-areas")
     public ResponseEntity<List<PublicServiceAreaResponse>> serviceAreas() {
         return ResponseEntity.ok().cacheControl(CACHE).body(publicSiteService.getServiceAreas());
+    }
+
+    @Operation(summary = "Tham số đặt đơn online công khai (bật/tắt, giao nhận, số giờ đặt trước, mức tối thiểu lấy tận nơi)")
+    @GetMapping("/booking-settings")
+    public ResponseEntity<PublicBookingSettingsResponse> bookingSettings() {
+        return ResponseEntity.ok().cacheControl(CACHE).body(publicSiteService.getBookingSettings());
     }
 }

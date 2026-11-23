@@ -1,6 +1,7 @@
 package com.laundry.modules.order.application.dto;
 
 import com.laundry.modules.order.domain.Order;
+import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.order.domain.OrderPriority;
 import com.laundry.modules.order.domain.OrderStatus;
 import com.laundry.modules.order.domain.OrderType;
@@ -27,6 +28,7 @@ public record OrderDetailResponse(
         String voucherCode,
         BigDecimal expressFee,
         BigDecimal totalAmount,
+        BigDecimal payableAmount,
         String note,
         OrderPriority priority,
         OrderType orderType,
@@ -55,7 +57,14 @@ public record OrderDetailResponse(
         BigDecimal incidentDiscount,
         List<String> incidentCodes,
         Integer compensationMultiplier,
-        BigDecimal compensationCap
+        BigDecimal compensationCap,
+        OrderChannel channel,
+        Instant confirmedAt,
+        String confirmedBy,
+        OrderFulfillmentResponse fulfillment,
+        Instant paymentClaimedAt,
+        String paymentClaimRejectedReason,
+        Instant paymentClaimRejectedAt
 ) {
     public static OrderDetailResponse from(Order order) {
         List<RequestedServiceDto> requested = order.getRequestedServiceIds() == null ? List.of()
@@ -90,6 +99,7 @@ public record OrderDetailResponse(
                 order.getVoucherCode(),
                 order.getExpressFee(),
                 order.getTotalAmount(),
+                order.payableAmount(),
                 order.getNote(),
                 order.getPriority(),
                 order.getOrderType(),
@@ -118,7 +128,14 @@ public record OrderDetailResponse(
                 order.getIncidentDiscount(),
                 incidentCodes,
                 compensationMultiplier,
-                compensationCap
+                compensationCap,
+                order.getChannel(),
+                order.getConfirmedAt(),
+                order.getConfirmedBy(),
+                OrderFulfillmentResponse.from(order),
+                order.getPaymentClaimedAt(),
+                order.getPaymentClaimRejectedReason(),
+                order.getPaymentClaimRejectedAt()
         );
     }
 }

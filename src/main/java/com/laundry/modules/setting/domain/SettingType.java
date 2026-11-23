@@ -43,6 +43,16 @@ public enum SettingType {
         }
     },
 
+    BOOLEAN("true hoặc false") {
+        @Override
+        public Object parse(String raw) {
+            String value = raw.trim();
+            if (value.equalsIgnoreCase("true")) return Boolean.TRUE;
+            if (value.equalsIgnoreCase("false")) return Boolean.FALSE;
+            throw new IllegalArgumentException("Chỉ nhận true hoặc false");
+        }
+    },
+
     /** Rỗng (chưa nhập) hoặc 10 chữ số bắt đầu bằng 0. */
     PHONE("số điện thoại 10 chữ số, bắt đầu bằng 0") {
         @Override

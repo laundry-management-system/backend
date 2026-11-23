@@ -14,10 +14,11 @@ public record RevenuePaymentResponse(
         String invoiceNo,
         Long orderId,
         String orderCode,
-        String customerName
+        String customerName,
+        @Schema(description = "Kênh của đơn: ONLINE hoặc OFFLINE") String channel
 ) {
     public static RevenuePaymentResponse from(RevenuePaymentRecord r) {
         return new RevenuePaymentResponse(r.paymentId(), r.paidAt(), r.method(), r.amount(),
-                r.invoiceNo(), r.orderId(), r.orderCode(), r.customerName());
+                r.invoiceNo(), r.orderId(), r.orderCode(), r.customerName(), r.channel());
     }
 }

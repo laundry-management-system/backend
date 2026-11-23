@@ -5,8 +5,9 @@ import com.laundry.modules.service.domain.ServiceUnit;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.math.BigDecimal;
 
-@Schema(description = "Dịch vụ đang hoạt động trên bảng giá công khai, không có id và dữ liệu audit")
+@Schema(description = "Dịch vụ đang hoạt động trên bảng giá công khai, không có dữ liệu audit")
 public record PublicServiceResponse(
+        Long id,
         String name,
         ServiceUnit unit,
         BigDecimal price,
@@ -19,6 +20,7 @@ public record PublicServiceResponse(
 ) {
     public static PublicServiceResponse from(ServiceResponse service) {
         return new PublicServiceResponse(
+                service.id(),
                 service.name(),
                 service.unit(),
                 service.currentPrice(),

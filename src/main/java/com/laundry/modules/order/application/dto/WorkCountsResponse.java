@@ -10,10 +10,13 @@ public record WorkCountsResponse(
         @Schema(description = "Mới nhận, gồm cả chưa phân loại") long received,
         @Schema(description = "Đang xử lý") long processing,
         @Schema(description = "Đã quá giờ hẹn trả") long late,
-        @Schema(description = "Giặt nhanh") long express
+        @Schema(description = "Giặt nhanh") long express,
+        @Schema(description = "Chờ xác nhận (đơn online)") long pendingConfirmation,
+        @Schema(description = "Chờ nhận đồ (đơn online)") long awaitingDropoff
 ) {
     public static WorkCountsResponse from(WorkCounts c) {
         return new WorkCountsResponse(c.getTotal(), c.getUnclassified(), c.getReceived(),
-                c.getProcessing(), c.getLate(), c.getExpress());
+                c.getProcessing(), c.getLate(), c.getExpress(),
+                c.getPendingConfirmation(), c.getAwaitingDropoff());
     }
 }

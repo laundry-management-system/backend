@@ -6,6 +6,10 @@ import com.laundry.modules.customer.application.CustomerService;
 import com.laundry.modules.document.application.DocumentService;
 import com.laundry.modules.document.application.dto.DocumentResponse;
 import com.laundry.modules.document.domain.Document;
+import com.laundry.modules.log.application.AuditLogService;
+import com.laundry.modules.log.application.dto.AuditEntry;
+import com.laundry.modules.log.domain.AuditAction;
+import com.laundry.modules.log.domain.EntityType;
 import com.laundry.modules.order.application.dto.AddOrderItemImageRequest;
 import com.laundry.modules.order.application.dto.AdjustPriceRequest;
 import com.laundry.modules.order.application.dto.ApplyOrderVoucherRequest;
@@ -13,7 +17,6 @@ import com.laundry.modules.order.application.dto.CancelOrderRequest;
 import com.laundry.modules.order.application.dto.ChangeStatusRequest;
 import com.laundry.modules.order.application.dto.CompleteOrderRequest;
 import com.laundry.modules.order.application.dto.CustomerTrackingResponse;
-import com.laundry.modules.order.application.dto.DeliverOrderRequest;
 import com.laundry.modules.order.application.dto.EstimateReturnTimeRequest;
 import com.laundry.modules.order.application.dto.EstimateReturnTimeResponse;
 import com.laundry.modules.order.application.dto.IntakeOrderRequest;
@@ -26,15 +29,23 @@ import com.laundry.modules.order.application.dto.OrderItemDto;
 import com.laundry.modules.order.application.dto.OrderReceiptResponse;
 import com.laundry.modules.order.application.dto.OrderResponse;
 import com.laundry.modules.order.application.dto.QuickCreateOrderRequest;
+import com.laundry.modules.order.application.dto.CompleteDropoffRequest;
+import com.laundry.modules.order.application.dto.RejectOrderRequest;
+import com.laundry.modules.order.application.dto.StartDeliveryRequest;
+import com.laundry.modules.order.application.dto.UndoDeliveryRequest;
+import com.laundry.modules.order.application.dto.UpdateTrackingCodesRequest;
+import com.laundry.modules.order.application.dto.RescheduleAppointmentRequest;
 import com.laundry.modules.order.application.dto.RequestedServiceDto;
 import com.laundry.modules.order.application.dto.RescheduleOrderRequest;
 import com.laundry.modules.order.application.dto.RevertStatusRequest;
 import com.laundry.modules.order.application.dto.UpdateOrderItemsRequest;
 import com.laundry.modules.order.application.dto.WorkCountsResponse;
+import com.laundry.modules.order.domain.AppointmentRules;
 import com.laundry.modules.order.domain.HistoryActionType;
 import com.laundry.modules.order.domain.ItemUnit;
 import com.laundry.modules.order.domain.Order;
 import com.laundry.modules.order.domain.OrderIncidentQuery;
+import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.order.domain.OrderImage;
 import com.laundry.modules.order.domain.OrderImageRepository;
 import com.laundry.modules.order.domain.OrderItem;
@@ -44,18 +55,24 @@ import com.laundry.modules.order.domain.OrderRepository;
 import com.laundry.modules.order.domain.OrderStatus;
 import com.laundry.modules.order.domain.OrderType;
 import com.laundry.modules.order.domain.PaymentStatus;
+import com.laundry.modules.order.domain.ReturnMethod;
+import com.laundry.modules.order.infrastructure.CustomerVoucherRateLimiter;
 import com.laundry.modules.order.domain.ServiceType;
 import com.laundry.modules.service.domain.LaundryService;
 import com.laundry.modules.service.domain.LaundryServiceRepository;
 import com.laundry.modules.service.domain.ServiceStatus;
 import com.laundry.modules.setting.application.SettingService;
+import com.laundry.modules.setting.domain.SettingKey;
 import com.laundry.modules.voucher.application.VoucherService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalTime;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.Objects;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -64,6 +81,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import com.laundry.modules.order.application.dto.CustomerOrderDetailResponse;
 import com.laundry.modules.order.application.dto.CustomerPortalOrderResponse;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.PageRequest;
@@ -86,6 +104,8 @@ public class OrderService {
     private final DocumentService documentService;
     private final VoucherService voucherService;
     private final OrderIncidentQuery orderIncidentQuery;
+    private final AuditLogService auditLogService;
+    private final CustomerVoucherRateLimiter customerVoucherRateLimiter;
 
     /**
      * Tạo một lượt nhận (1–2 đơn) trong một transaction. Dịch vụ chọn ở quầy chỉ lưu làm tham khảo:
@@ -280,6 +300,9 @@ public class OrderService {
     @Transactional
     public OrderReceiptResponse getReceipt(Long id, String webBaseUrl) {
         Order order = findOrderById(id);
+        if (order.getStatus().isBeforeDropoff()) {
+            throw new BusinessException(Order.BEFORE_DROPOFF_MESSAGE);
+        }
         order.markReceiptPrinted();
         if (!order.isIntakeV3()) {
             return OrderReceiptResponse.from(order, webBaseUrl, 1, 1, order.getWhitesFee(), List.of(),
@@ -388,7 +411,8 @@ public class OrderService {
         }
 
         order.updateItems(items, performedBy);
-        order.setWhitesFee(Boolean.TRUE.equals(order.getWashWhitesSeparately()) ? settingService.getWhitesFee() : BigDecimal.ZERO);
+        boolean whitesLine = services.values().stream().anyMatch(s -> Boolean.TRUE.equals(s.getWhitesApplicable()));
+        order.setWhitesFee(Boolean.TRUE.equals(order.getWashWhitesSeparately()) && whitesLine ? settingService.getWhitesFee() : BigDecimal.ZERO);
         order.recalcTotals(request.discountAmount());
         return toDetail(orderRepository.saveAndFlush(order));
     }
@@ -398,6 +422,9 @@ public class OrderService {
     public OrderDetailResponse applyVoucher(Long id, ApplyOrderVoucherRequest request, String performedBy) {
         Order order = orderRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new NotFoundException("Không tìm thấy đơn hàng với ID: " + id));
+        if (isOnlineDelivery(order)) {
+            throw new BusinessException("Voucher của đơn giao tận nơi chỉ do khách áp dụng");
+        }
         String code = request.voucherCode();
         if (code == null || code.isBlank()) {
             if (order.getVoucherId() == null) return toDetail(order);
@@ -408,6 +435,79 @@ public class OrderService {
             order.applyVoucher(applied.voucherId(), applied.code(), applied.discountAmount(), performedBy);
         }
         return toDetail(orderRepository.saveAndFlush(order));
+    }
+
+    /** Khách áp / đổi voucher của chính mình cho đơn ONLINE giao tận nơi trước khi báo đã thanh toán (FR-043..FR-046). */
+    @Transactional
+    public CustomerOrderDetailResponse applyCustomerVoucher(Long customerId, String clientIp, String orderCode, String code) {
+        customerVoucherRateLimiter.check(customerId, clientIp);
+        Order order = lockCustomerPayable(customerId, orderCode);
+        if (!order.voucherEditableByCustomer()) {
+            throw new BusinessException("Voucher đã khoá, không thể đổi");
+        }
+        VoucherService.AppliedVoucher applied = voucherService.applyToOrder(code, order.getSubtotal(), order.getVoucherId());
+        order.applyVoucher(applied.voucherId(), applied.code(), applied.discountAmount(),
+                customerService.getCustomerById(customerId).customerCode());
+        order.setVoucherByCustomer(true);
+        return toCustomerDetail(orderRepository.saveAndFlush(order));
+    }
+
+    /** Khách gỡ voucher của chính mình, hoàn lượt dùng (FR-044). */
+    @Transactional
+    public CustomerOrderDetailResponse removeCustomerVoucher(Long customerId, String clientIp, String orderCode) {
+        customerVoucherRateLimiter.check(customerId, clientIp);
+        Order order = lockCustomerPayable(customerId, orderCode);
+        if (!order.voucherEditableByCustomer()) {
+            throw new BusinessException("Voucher đã khoá, không thể gỡ");
+        }
+        if (order.getVoucherId() == null) {
+            throw new BusinessException("Đơn chưa có voucher");
+        }
+        voucherService.releaseVoucher(order.getVoucherId());
+        order.applyVoucher(null, null, BigDecimal.ZERO, customerService.getCustomerById(customerId).customerCode());
+        order.setVoucherByCustomer(null);
+        return toCustomerDetail(orderRepository.saveAndFlush(order));
+    }
+
+    /** Khách báo đã chuyển khoản; không giới hạn tần suất vì idempotent (FR-047). */
+    @Transactional
+    public CustomerOrderDetailResponse claimCustomerPayment(Long customerId, String orderCode) {
+        Order order = lockOwnOrder(customerId, orderCode);
+        order.claimPayment(customerService.getCustomerById(customerId).customerCode());
+        return toCustomerDetail(orderRepository.saveAndFlush(order));
+    }
+
+    /** Khách xác nhận đã nhận đơn giao tận nơi; idempotent nên không giới hạn tần suất (FR-057, FR-058). */
+    @Transactional
+    public CustomerOrderDetailResponse confirmCustomerReceived(Long customerId, String orderCode) {
+        Order order = lockOwnOrder(customerId, orderCode);
+        order.confirmReceived(customerService.getCustomerById(customerId).customerCode());
+        return toCustomerDetail(orderRepository.saveAndFlush(order));
+    }
+
+    /** Nhân viên từ chối báo thanh toán kèm lý do (FR-048). */
+    @Transactional
+    public OrderDetailResponse rejectPaymentClaim(Long orderId, String reason, String staff) {
+        Order order = lockOrder(orderId);
+        order.rejectPaymentClaim(reason, staff);
+        return toDetail(orderRepository.saveAndFlush(order));
+    }
+
+    private Order lockOwnOrder(Long customerId, String orderCode) {
+        Long id = orderRepository.findByOrderCodeAndCustomerId(orderCode, customerId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy đơn hàng")).getId();
+        return lockOrder(id);
+    }
+
+    private Order lockCustomerPayable(Long customerId, String orderCode) {
+        Order order = lockOwnOrder(customerId, orderCode);
+        order.requireCustomerPayable();
+        return order;
+    }
+
+    private static boolean isOnlineDelivery(Order order) {
+        return order.getChannel() == OrderChannel.ONLINE && order.getFulfillment() != null
+                && order.getFulfillment().getReturnMethod() == ReturnMethod.DELIVERY;
     }
 
     @Transactional
@@ -450,13 +550,6 @@ public class OrderService {
     }
 
     @Transactional
-    public OrderDetailResponse deliverOrder(Long id, DeliverOrderRequest request, String performedBy) {
-        Order order = findOrderById(id);
-        order.deliver(request.receiverName(), request.receiverRelation(), performedBy);
-        return toDetail(orderRepository.saveAndFlush(order));
-    }
-
-    @Transactional
     public OrderDetailResponse revertStatus(Long id, RevertStatusRequest request, String performedBy) {
         Order order = findOrderById(id);
         order.revertStatus(request.targetStatus(), request.reason(), performedBy);
@@ -483,10 +576,96 @@ public class OrderService {
 
     @Transactional
     public OrderDetailResponse cancel(Long id, CancelOrderRequest request, String performedBy) {
-        Order order = findOrderById(id);
-        order.cancel(request.reason(), performedBy);
+        Order order = lockOrder(id);
+        Map<String, Object> old = auditSnapshot(order);
+        order.cancel(request.customerReason(), request.reason(), performedBy);
         voucherService.releaseVoucher(order.getVoucherId());
-        return toDetail(orderRepository.saveAndFlush(order));
+        Order saved = orderRepository.saveAndFlush(order);
+        if (saved.getChannel() == OrderChannel.ONLINE) {
+            audit(AuditAction.ORDER_REJECT, saved, old, request.reason());
+        }
+        return toDetail(saved);
+    }
+
+    @Transactional
+    public OrderDetailResponse confirm(Long id, String performedBy) {
+        Order order = lockOrder(id);
+        Map<String, Object> old = auditSnapshot(order);
+        order.confirm(performedBy);
+        return toDetail(audited(AuditAction.ORDER_CONFIRM, order, old, null));
+    }
+
+    @Transactional
+    public OrderDetailResponse reject(Long id, RejectOrderRequest request, String performedBy) {
+        Order order = lockOrder(id);
+        Map<String, Object> old = auditSnapshot(order);
+        order.reject(request.customerReason(), request.reason(), performedBy);
+        voucherService.releaseVoucher(order.getVoucherId());
+        return toDetail(audited(AuditAction.ORDER_REJECT, order, old, request.reason()));
+    }
+
+    @Transactional
+    public OrderDetailResponse completeDropoff(Long id, CompleteDropoffRequest request, String performedBy) {
+        Order order = lockOrder(id);
+        Map<String, Object> old = auditSnapshot(order);
+        order.completeDropoff(request.pickupTrackingCode(), performedBy);
+        return toDetail(audited(AuditAction.ORDER_FULFILLMENT_UPDATE, order, old, null));
+    }
+
+    @Transactional
+    public OrderDetailResponse startDelivery(Long id, StartDeliveryRequest request, String performedBy) {
+        Order order = lockOrder(id);
+        Map<String, Object> old = auditSnapshot(order);
+        order.startDelivery(request.deliveryTrackingCode(), performedBy);
+        return toDetail(audited(AuditAction.ORDER_FULFILLMENT_UPDATE, order, old, null));
+    }
+
+    @Transactional
+    public OrderDetailResponse undoStartDelivery(Long id, UndoDeliveryRequest request, String performedBy) {
+        Order order = lockOrder(id);
+        Map<String, Object> old = auditSnapshot(order);
+        order.undoStartDelivery(request.reason(), performedBy);
+        return toDetail(audited(AuditAction.ORDER_FULFILLMENT_UPDATE, order, old, request.reason()));
+    }
+
+    @Transactional
+    public OrderDetailResponse updateTrackingCodes(Long id, UpdateTrackingCodesRequest request, String performedBy) {
+        Order order = lockOrder(id);
+        Map<String, Object> old = auditSnapshot(order);
+        order.updateTrackingCodes(request.pickupTrackingCode(), request.deliveryTrackingCode(), performedBy);
+        return toDetail(audited(AuditAction.ORDER_FULFILLMENT_UPDATE, order, old, null));
+    }
+
+    @Transactional
+    public OrderDetailResponse rescheduleAppointment(Long id, RescheduleAppointmentRequest request, String performedBy) {
+        Order order = lockOrder(id);
+        if (order.getFulfillment() != null && order.getStatus().isBeforeDropoff()) {
+            Instant now = Instant.now();
+            LocalTime open = settingService.getValue(SettingKey.OPENING_TIME, LocalTime.class);
+            LocalTime close = settingService.getValue(SettingKey.CLOSING_TIME, LocalTime.class);
+            Instant dropoffAt = request.appointmentAt() != null
+                    ? request.appointmentAt() : order.getFulfillment().getAppointmentAt();
+            String error = null;
+            String field = "appointmentAt";
+            if (request.appointmentAt() != null) {
+                error = AppointmentRules.appointmentError(request.appointmentAt(), now, open, close,
+                        settingService.getValue(SettingKey.BOOKING_MIN_LEAD_HOURS, Integer.class));
+            }
+            if (error == null && (request.returnAt() != null || request.appointmentAt() != null)) {
+                field = "returnAt";
+                SettingKey gap = order.getOrderType() == OrderType.EXPRESS
+                        ? SettingKey.BOOKING_RETURN_GAP_HOURS_EXPRESS : SettingKey.BOOKING_RETURN_GAP_HOURS_NORMAL;
+                error = AppointmentRules.returnError(
+                        request.returnAt() != null ? request.returnAt() : order.getDueAt(), dropoffAt, open, close,
+                        settingService.getValue(gap, Integer.class));
+            }
+            if (error != null) {
+                throw new BusinessException(error, field);
+            }
+        }
+        Map<String, Object> old = auditSnapshot(order);
+        order.rescheduleAppointment(request.appointmentAt(), request.returnAt(), performedBy);
+        return toDetail(audited(AuditAction.ORDER_FULFILLMENT_UPDATE, order, old, null));
     }
 
     @Transactional(readOnly = true)
@@ -515,27 +694,81 @@ public class OrderService {
     @Transactional(readOnly = true)
     public Page<OrderResponse> getOrders(OrderFilter f, Pageable pageable) {
         List<OrderStatus> statuses = f.statuses().isEmpty() ? List.of(OrderStatus.values()) : f.statuses();
-        return orderRepository.searchOrders(f.status(), statuses, f.priority(), f.orderType(), f.classified(),
-                        f.late(), Instant.now(), f.dueStart(), f.dueEnd(), f.phone(), f.search(), f.intakeCode(), pageable)
+        Pageable sorted = pageable.getSort().isSorted() ? pageable
+                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), OrderRepository.DEFAULT_SORT);
+        return orderRepository.searchOrders(f.status(), statuses, f.channel(), f.priority(), f.orderType(), f.classified(),
+                        f.late(), Instant.now(), f.dueStart(), f.dueEnd(), f.phone(), f.search(), f.intakeCode(), sorted)
                 .map(OrderResponse::from);
     }
 
     @Transactional(readOnly = true)
     public Page<CustomerPortalOrderResponse> listForCustomer(Long customerId, int page, int size) {
         Pageable pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, 50),
-                Sort.by(Sort.Direction.DESC, "receivedAt").and(Sort.by(Sort.Direction.DESC, "id")));
-        return orderRepository.findByCustomerId(customerId, pageable).map(CustomerPortalOrderResponse::from);
+                Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id")));
+        Page<Order> orders = orderRepository.findByCustomerId(customerId, pageable);
+        Set<Long> ids = orders.stream().flatMap(o -> CustomerPortalOrderResponse.serviceIds(o).stream())
+                .collect(Collectors.toSet());
+        Map<Long, String> names = ids.isEmpty() ? Map.of() : laundryServiceRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(LaundryService::getId, LaundryService::getName));
+        return orders.map(o -> CustomerPortalOrderResponse.from(o, names));
+    }
+
+    /** Đơn không thuộc khách và mã không tồn tại cùng 404 (FR-041). */
+    @Transactional(readOnly = true)
+    public CustomerOrderDetailResponse getForCustomer(Long customerId, String orderCode) {
+        Order order = orderRepository.findByOrderCodeAndCustomerId(orderCode, customerId)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy đơn hàng"));
+        return toCustomerDetail(order);
+    }
+
+    private CustomerOrderDetailResponse toCustomerDetail(Order order) {
+        Set<Long> ids = order.getRequestedServiceIds() == null ? Set.of() : order.getRequestedServiceIds().stream()
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, String> names = ids.isEmpty() ? Map.of() : laundryServiceRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(LaundryService::getId, LaundryService::getName));
+        return CustomerOrderDetailResponse.from(order, names);
     }
 
     @Transactional(readOnly = true)
     public WorkCountsResponse getWorkCounts(OrderFilter f) {
         return WorkCountsResponse.from(orderRepository.countWork(
-                Instant.now(), f.dueStart(), f.dueEnd(), f.phone(), f.search()));
+                Instant.now(), f.channel(), f.dueStart(), f.dueEnd(), f.phone(), f.search()));
     }
 
     @Transactional(readOnly = true)
     public OrderDetailResponse getOrderDetail(Long id) {
         return toDetail(findOrderById(id));
+    }
+
+    private Order audited(AuditAction action, Order order, Map<String, Object> old, String reason) {
+        Order saved = orderRepository.saveAndFlush(order);
+        audit(action, saved, old, reason);
+        return saved;
+    }
+
+    private void audit(AuditAction action, Order order, Map<String, Object> old, String reason) {
+        auditLogService.log(new AuditEntry(action, EntityType.ORDER, order.getId(), old, auditSnapshot(order), reason));
+    }
+
+    private Map<String, Object> auditSnapshot(Order order) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("orderCode", order.getOrderCode());
+        m.put("status", order.getStatus().name());
+        m.put("dueAt", order.getDueAt());
+        var f = order.getFulfillment();
+        if (f != null) {
+            m.put("appointmentAt", f.getAppointmentAt());
+            m.put("dropoffStatus", f.getDropoffStatus());
+            m.put("returnStatus", f.getReturnStatus());
+            m.put("pickupTrackingCode", f.getPickupTrackingCode());
+            m.put("deliveryTrackingCode", f.getDeliveryTrackingCode());
+        }
+        return m;
+    }
+
+    private Order lockOrder(Long id) {
+        return orderRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new NotFoundException("Không tìm thấy đơn hàng với ID: " + id));
     }
 
     private Order findOrderById(Long id) {

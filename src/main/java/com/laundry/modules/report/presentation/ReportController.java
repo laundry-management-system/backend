@@ -1,5 +1,6 @@
 package com.laundry.modules.report.presentation;
 
+import com.laundry.modules.order.domain.OrderChannel;
 import com.laundry.modules.report.application.ReportService;
 import com.laundry.modules.report.application.dto.DashboardResponse;
 import com.laundry.modules.report.application.dto.OrderReportResponse;
@@ -49,8 +50,10 @@ public class ReportController {
             @Parameter(description = "Ngày kết thúc (gồm cả ngày này), dạng yyyy-MM-dd", example = "2026-10-31")
             @RequestParam(required = false) String to,
             @Parameter(description = "DAY hoặc MONTH, mặc định DAY", example = "DAY")
-            @RequestParam(required = false) String granularity) {
-        return reportService.getRevenueReport(from, to, granularity);
+            @RequestParam(required = false) String granularity,
+            @Parameter(description = "ONLINE hoặc OFFLINE; bỏ trống = tất cả", example = "ONLINE")
+            @RequestParam(required = false) OrderChannel channel) {
+        return reportService.getRevenueReport(from, to, granularity, channel);
     }
 
     @Operation(
@@ -64,8 +67,10 @@ public class ReportController {
             @Parameter(description = "Ngày bắt đầu, dạng yyyy-MM-dd", example = "2026-11-05")
             @RequestParam(required = false) String from,
             @Parameter(description = "Ngày kết thúc (gồm cả ngày này), dạng yyyy-MM-dd", example = "2026-11-05")
-            @RequestParam(required = false) String to) {
-        return reportService.getRevenuePayments(from, to);
+            @RequestParam(required = false) String to,
+            @Parameter(description = "ONLINE hoặc OFFLINE; bỏ trống = tất cả", example = "ONLINE")
+            @RequestParam(required = false) OrderChannel channel) {
+        return reportService.getRevenuePayments(from, to, channel);
     }
 
     @Operation(
@@ -104,7 +109,9 @@ public class ReportController {
             @Parameter(description = "Ngày kết thúc (gồm cả ngày này), dạng yyyy-MM-dd", example = "2026-10-31")
             @RequestParam(required = false) String to,
             @Parameter(description = "DAY hoặc MONTH, mặc định DAY", example = "DAY")
-            @RequestParam(required = false) String granularity) {
-        return reportService.getOrderReport(from, to, granularity);
+            @RequestParam(required = false) String granularity,
+            @Parameter(description = "ONLINE hoặc OFFLINE; bỏ trống = tất cả", example = "ONLINE")
+            @RequestParam(required = false) OrderChannel channel) {
+        return reportService.getOrderReport(from, to, granularity, channel);
     }
 }
